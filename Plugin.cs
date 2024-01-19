@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using System.Collections.Generic;
 using System.IO;
 using BepInEx;
@@ -32,10 +32,14 @@ namespace MinimumQuotaFinder
 
         public void CreateShader()
         {
-            var shaderPath = Path.Join(Path.GetDirectoryName(Info.Location), "OutlineShader.shader");
-
-            // Create a new material with the outline shader
-            outlineMaterial = new Material(ReadShaderCode(shaderPath));
+            outlineMaterial = new Material(Shader.Find("Standard"))
+            {
+                color = Color.red
+            };
+            // var shaderPath = Path.Join(Path.GetDirectoryName(Info.Location), "OutlineShader.shader");
+            //
+            // // Create a new material with the outline shader
+            // outlineMaterial = new Material(ReadShaderCode(shaderPath));
         }
 
         public void OnHighlightKeyPressed(InputAction.CallbackContext highlightContext)
@@ -96,10 +100,9 @@ namespace MinimumQuotaFinder
                 
                 if (renderer == null) continue;
                 if (highlightedObjects.ContainsKey(obj)) continue;
-                    
-                var outlineInstance = new Material(outlineMaterial);
+                
                 highlightedObjects.Add(obj, renderer.material);
-                renderer.material = outlineInstance;
+                renderer.material = outlineMaterial;
             }
         }
 
