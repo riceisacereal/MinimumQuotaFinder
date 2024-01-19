@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using BepInEx;
 using LethalCompanyInputUtils.Api;
 using UnityEngine;
@@ -46,18 +47,22 @@ namespace MinimumQuotaFinder
 
             var value = CalculateLootValue();
         }
-        
-        private float CalculateLootValue()
+
+        private List<GrabbableObject> GetMinimumQuotaScrapList()
         {
             GameObject ship = GameObject.Find("/Environment/HangarShip");
             // Get all objects that can be picked up from inside the ship. Also remove items which technically have
             // scrap value but don't actually add to your quota.
             var loot = ship.GetComponentsInChildren<GrabbableObject>()
-                .Where(obj => obj.name != "ClipboardManual" && obj.name != "StickyNoteItem" && obj.name != "Key(Clone)" && obj.name != "Key").ToList();
+                .Where(obj => obj.itemProperties.isScrap).ToList();
             
-            
-            // loot.Do(scrap => ShipLoot.Log.LogDebug($"{scrap.name} - ${scrap.scrapValue}"));
-            return loot.Sum(scrap => scrap.scrapValue);
+            loot.Sort((x, y) => x.itemProperties.itemId.CompareTo(y.itemProperties.itemId));
+            return loot;
+        }
+        
+        private float CalculateLootValue()
+        {
+            return 0;
         }
     }
     
