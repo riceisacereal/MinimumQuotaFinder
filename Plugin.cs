@@ -1,4 +1,6 @@
 ﻿using System.Linq;
+using System.Collections.Generic;
+using System.IO;
 using BepInEx;
 using LethalCompanyInputUtils.Api;
 using UnityEngine;
@@ -11,10 +13,14 @@ namespace MinimumQuotaFinder
     public class MinimumQuotaFinder : BaseUnityPlugin
     {
         internal static HighlightInputClass InputActionsInstance = new();
+        public Material outlineMaterial;
+        private Dictionary<GrabbableObject, Material> highlightedObjects = new Dictionary<GrabbableObject, Material>();
+        private bool toggled = false;
         
         private void Awake()
         {
             SetupKeybindCallbacks();
+            CreateShader();
             
             Logger.LogInfo("Plugin is loaded!");
         }
@@ -24,10 +30,22 @@ namespace MinimumQuotaFinder
             InputActionsInstance.HighlightKey.performed += OnHighlightKeyPressed;
         }
 
+        public void CreateShader()
+        {
+            var shaderPath = Path.Join(Path.GetDirectoryName(Info.Location), "OutlineShader.shader");
+
+            // Create a new material with the outline shader
+            outlineMaterial = new Material(ReadShaderCode(shaderPath));
+        }
+
         public void OnHighlightKeyPressed(InputAction.CallbackContext highlightContext)
         {
             if (!highlightContext.performed) return; 
             // Add more context checks if desired
+            
+            Logger.LogInfo("Button pressed!");
+
+            toggled = !toggled;
  
             // Your executing code here
             
@@ -44,20 +62,78 @@ namespace MinimumQuotaFinder
             if (!StartOfRound.Instance.inShipPhase && !GameNetworkManager.Instance.localPlayerController.isInHangarShipRoom)
                 return;
 
-            var value = CalculateLootValue();
+            var shipItems = GetShipItems();
+
+            if (toggled)
+            {
+                HighlightObjects(shipItems);
+            }
+            else
+            {
+                UnhighlightObjects();
+            }
+
+            Logger.LogInfo("Plugin is loaded!");
         }
         
-        private float CalculateLootValue()
+        private static List<GrabbableObject> GetShipItems()
         {
-            GameObject ship = GameObject.Find("/Environment/HangarShip");
+            var ship = GameObject.Find("/Environment/HangarShip");
             // Get all objects that can be picked up from inside the ship. Also remove items which technically have
             // scrap value but don't actually add to your quota.
             var loot = ship.GetComponentsInChildren<GrabbableObject>()
                 .Where(obj => obj.name != "ClipboardManual" && obj.name != "StickyNoteItem" && obj.name != "Key(Clone)" && obj.name != "Key").ToList();
-            
-            
             // loot.Do(scrap => ShipLoot.Log.LogDebug($"{scrap.name} - ${scrap.scrapValue}"));
-            return loot.Sum(scrap => scrap.scrapValue);
+
+            return loot;
+        }
+
+        private void HighlightObjects(List<GrabbableObject> objectsToHighlight)
+        {
+            foreach (var obj in objectsToHighlight)
+            {
+                Renderer renderer = obj.mainObjectRenderer;
+                
+                if (renderer == null) continue;
+                if (highlightedObjects.ContainsKey(obj)) continue;
+                    
+                var outlineInstance = new Material(outlineMaterial);
+                highlightedObjects.Add(obj, renderer.material);
+                renderer.material = outlineInstance;
+            }
+        }
+
+        private void UnhighlightObjects()
+        {
+            var toRemove = new List<GrabbableObject>();
+            foreach (var objectEntry in highlightedObjects)
+            {
+                objectEntry.Key.mainObjectRenderer.material = objectEntry.Value;
+                toRemove.Add(objectEntry.Key);
+            }
+
+            foreach (var obj in toRemove)
+            {
+                highlightedObjects.Remove(obj);
+            }
+        }
+        
+        // Read shader code from file
+        private static string ReadShaderCode(string filePath)
+        {
+            try
+            {
+                // Read all lines from the file
+                var lines = File.ReadAllLines(filePath);
+
+                // Concatenate lines into a single string
+                return string.Join("\n", lines);
+            }
+            catch (IOException e)
+            {
+                Debug.LogError($"Error reading shader code from file: {e.Message}");
+                return null;
+            }
         }
     }
     
