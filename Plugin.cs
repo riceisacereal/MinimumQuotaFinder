@@ -32,11 +32,14 @@ namespace MinimumQuotaFinder
 
         public void CreateShader()
         {
-            outlineMaterial = new Material(Shader.Find("Standard"))
-            {
-                color = Color.red
-            };
-            // var shaderPath = Path.Join(Path.GetDirectoryName(Info.Location), "OutlineShader.shader");
+            var bundlePath = Path.Join(Path.GetDirectoryName(Info.Location), "AssetBundles/outlineshader.shader");
+            var shaderBundle = AssetBundle.LoadFromFile(bundlePath);
+            Logger.LogInfo(shaderBundle.GetAllAssetNames());
+            var shader = shaderBundle.LoadAsset<Shader>("outlineshader.shader");
+            Logger.LogInfo("Shader is loaded!");
+            Logger.LogInfo(shader);
+            outlineMaterial = new Material(shader);
+            Logger.LogInfo("Material has been created!");
             //
             // // Create a new material with the outline shader
             // outlineMaterial = new Material(ReadShaderCode(shaderPath));
@@ -97,6 +100,7 @@ namespace MinimumQuotaFinder
             foreach (var obj in objectsToHighlight)
             {
                 Renderer renderer = obj.mainObjectRenderer;
+                print(obj.parentObject);
                 
                 if (renderer == null) continue;
                 if (highlightedObjects.ContainsKey(obj)) continue;
