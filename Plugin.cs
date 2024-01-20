@@ -63,12 +63,13 @@ namespace MinimumQuotaFinder
         private List<GrabbableObject> GetExcludedList(int[,] mem, List<GrabbableObject> allSchipScrap)
         {
             List<GrabbableObject> excludedScrap = new List<GrabbableObject>();
-
-            int y = mem.GetLength(0);
-            int x = mem.GetLength(1);
+            
+            int y = mem.GetLength(0) - 1;
+            int x = mem.GetLength(1) - 1;
             while (x >= 0 && y >= 1)
             {
                 int currentScrapValue = allSchipScrap[y - 1].scrapValue;
+                
                 // Excluded
                 if (mem[y, x] == mem[y - 1, x])
                 {
@@ -76,7 +77,7 @@ namespace MinimumQuotaFinder
                 }
                 else if (mem[y, x] == mem[y - 1, x - currentScrapValue] + currentScrapValue)
                 {
-                    excludedScrap.Add(allSchipScrap[y]);
+                    excludedScrap.Add(allSchipScrap[y - 1]);
                     y--;
                     x -= currentScrapValue;
                 }
@@ -87,9 +88,9 @@ namespace MinimumQuotaFinder
 
         private List<GrabbableObject> DoDynamicProgramming(int sold, int quota, List<GrabbableObject> allShipScrap)
         {
-            // Subset sum/knapsack on total value of all scraps - quota - already paid quota
+            // Subset sum/knapsack on total value of all scraps - quota + already paid quota
             int numItems = allShipScrap.Count;
-            int inverseTarget = allShipScrap.Sum(scrap => scrap.scrapValue) - quota - sold;
+            int inverseTarget = allShipScrap.Sum(scrap => scrap.scrapValue) - (quota - sold);
 
             int[,] mem = new int[numItems + 1, inverseTarget + 1];
 
