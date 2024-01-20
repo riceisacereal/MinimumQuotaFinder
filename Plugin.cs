@@ -97,8 +97,8 @@ namespace MinimumQuotaFinder
             int sumScrapValue = allShipScrap.Sum(scrap => scrap.scrapValue);
             if (sold + sumScrapValue < quota)
             {
-                HUDManager.Instance.DisplayTip("MinimumQuotaFinder",$"Employees still need to sell {quota - sold} value in scrap to reach quota." +
-                                $"Total scrap value on ship is {sumScrapValue}. Sell everything.");
+                HUDManager.Instance.DisplayTip("MinimumQuotaFinder",
+                    $"Not enough scrap to reach quota ({sumScrapValue} < {quota - sold}). Sell everything.");
                 return null;
             }
             
@@ -113,6 +113,8 @@ namespace MinimumQuotaFinder
                 }
             }
 
+            HUDManager.Instance.DisplayTip("MinimumQuotaFinder",
+                $"Total value of optimal scrap combination found: {toHighlight.Sum(scrap => scrap.scrapValue)}.");
             return toHighlight;
         }
 
