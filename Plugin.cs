@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.IO;
@@ -14,8 +15,8 @@ namespace MinimumQuotaFinder
     {
         internal static HighlightInputClass InputActionsInstance = new();
         public Material outlineMaterial;
-        private Dictionary<GrabbableObject, Material> highlightedObjects = new Dictionary<GrabbableObject, Material>();
-        private bool toggled = false;
+        private Dictionary<GrabbableObject, Material[]> highlightedObjects = new();
+        private bool toggled;
         
         private void Awake()
         {
@@ -28,21 +29,23 @@ namespace MinimumQuotaFinder
         public void SetupKeybindCallbacks()
         {
             InputActionsInstance.HighlightKey.performed += OnHighlightKeyPressed;
+            InputActionsInstance.ReloadShaderKey.performed += ReloadShader;
+        }
+
+        public void ReloadShader(InputAction.CallbackContext reloadContext)
+        {
+            CreateShader();
         }
 
         public void CreateShader()
         {
-            var bundlePath = Path.Join(Path.GetDirectoryName(Info.Location), "AssetBundles/outlineshader.shader");
+            var bundlePath = Path.Join(Path.GetDirectoryName(Info.Location), "outlineshader.shader");
             var shaderBundle = AssetBundle.LoadFromFile(bundlePath);
             Logger.LogInfo(shaderBundle.GetAllAssetNames());
             var shader = shaderBundle.LoadAsset<Shader>("outlineshader.shader");
-            Logger.LogInfo("Shader is loaded!");
             Logger.LogInfo(shader);
             outlineMaterial = new Material(shader);
-            Logger.LogInfo("Material has been created!");
-            //
-            // // Create a new material with the outline shader
-            // outlineMaterial = new Material(ReadShaderCode(shaderPath));
+            shaderBundle.Unload(false);
         }
 
         public void OnHighlightKeyPressed(InputAction.CallbackContext highlightContext)
@@ -79,8 +82,6 @@ namespace MinimumQuotaFinder
             {
                 UnhighlightObjects();
             }
-
-            Logger.LogInfo("Plugin is loaded!");
         }
         
         private static List<GrabbableObject> GetShipItems()
@@ -100,13 +101,19 @@ namespace MinimumQuotaFinder
             foreach (var obj in objectsToHighlight)
             {
                 Renderer renderer = obj.mainObjectRenderer;
-                print(obj.parentObject);
+                print(renderer.materials.Length);
                 
                 if (renderer == null) continue;
                 if (highlightedObjects.ContainsKey(obj)) continue;
                 
-                highlightedObjects.Add(obj, renderer.material);
-                renderer.material = outlineMaterial;
+                highlightedObjects.Add(obj, renderer.materials);
+
+                var newMaterials = new Material[renderer.materials.Length];
+                for (var i = 0; i < newMaterials.Length; i++)
+                {
+                    newMaterials[i] = Instantiate(outlineMaterial);
+                }
+                renderer.materials = new Material[renderer.materials.Length];
             }
         }
 
@@ -115,7 +122,7 @@ namespace MinimumQuotaFinder
             var toRemove = new List<GrabbableObject>();
             foreach (var objectEntry in highlightedObjects)
             {
-                objectEntry.Key.mainObjectRenderer.material = objectEntry.Value;
+                objectEntry.Key.mainObjectRenderer.materials = objectEntry.Value;
                 toRemove.Add(objectEntry.Key);
             }
 
@@ -124,29 +131,14 @@ namespace MinimumQuotaFinder
                 highlightedObjects.Remove(obj);
             }
         }
-        
-        // Read shader code from file
-        private static string ReadShaderCode(string filePath)
-        {
-            try
-            {
-                // Read all lines from the file
-                var lines = File.ReadAllLines(filePath);
-
-                // Concatenate lines into a single string
-                return string.Join("\n", lines);
-            }
-            catch (IOException e)
-            {
-                Debug.LogError($"Error reading shader code from file: {e.Message}");
-                return null;
-            }
-        }
     }
     
     public class HighlightInputClass : LcInputActions 
     {
         [InputAction("<Keyboard>/h", Name = "Calculate and highlight minimum scrap")]
         public InputAction HighlightKey { get; set; }
+        
+        [InputAction("<Keyboard>/j", Name = "Reload highlight shaders")]
+        public InputAction ReloadShaderKey { get; set; }
     }
 }
