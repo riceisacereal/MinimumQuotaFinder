@@ -1,10 +1,9 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Collections.Generic;
 using System.IO;
 using BepInEx;
 using LethalCompanyInputUtils.Api;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -31,11 +30,23 @@ namespace MinimumQuotaFinder
         {
             InputActionsInstance.HighlightKey.performed += OnHighlightKeyPressed;
             InputActionsInstance.ReloadShaderKey.performed += ReloadShader;
+            InputActionsInstance.SpawnScrap.performed += SpawnScrap;
         }
 
         public void ReloadShader(InputAction.CallbackContext reloadContext)
         {
             CreateShader();
+        }
+
+        public void SpawnScrap(InputAction.CallbackContext spawnContext)
+        {
+            Vector3 position = GameNetworkManager.Instance.localPlayerController.transform.position;
+            GameObject val = Instantiate(StartOfRound.Instance.allItemsList.itemsList[65].spawnPrefab, position, Quaternion.identity);
+            val.GetComponent<GrabbableObject>().fallTime = 0f;
+            val.AddComponent<ScanNodeProperties>().scrapValue = 25;
+            val.GetComponent<GrabbableObject>().SetScrapValue(25);
+            val.GetComponent<NetworkObject>().Spawn(false);
+            print(val.GetComponent<GrabbableObject>().itemProperties.isScrap);
         }
 
         public void CreateShader()
@@ -115,7 +126,7 @@ namespace MinimumQuotaFinder
             if (allShipScrap == null || allShipScrap.Count == 0)
             {
                 HUDManager.Instance.DisplayTip("MinimumQuotaFinder","No scrap detected within the ship.");
-                return null;
+                return new List<GrabbableObject>();
             }
             // If total value of scrap isn't above quota
             int sumScrapValue = allShipScrap.Sum(scrap => scrap.scrapValue);
@@ -123,7 +134,7 @@ namespace MinimumQuotaFinder
             {
                 HUDManager.Instance.DisplayTip("MinimumQuotaFinder",
                     $"Not enough scrap to reach quota ({sumScrapValue} < {quota - sold}). Sell everything.");
-                return null;
+                return new List<GrabbableObject>();
             }
             
             allShipScrap.Sort((x, y) => x.NetworkObjectId.CompareTo(y.NetworkObjectId));
@@ -169,11 +180,10 @@ namespace MinimumQuotaFinder
             
             List<GrabbableObject> toHighlight = GetListToHighlight();
             // TODO: Highlight scrap
-        }
 
             if (toggled)
             {
-                HighlightObjects(shipItems);
+                HighlightObjects(toHighlight);
             }
             else
             {
@@ -197,19 +207,21 @@ namespace MinimumQuotaFinder
             foreach (var obj in objectsToHighlight)
             {
                 Renderer renderer = obj.mainObjectRenderer;
-                print(renderer.materials.Length);
                 
                 if (renderer == null) continue;
                 if (highlightedObjects.ContainsKey(obj)) continue;
                 
                 highlightedObjects.Add(obj, renderer.materials);
 
-                var newMaterials = new Material[renderer.materials.Length];
-                for (var i = 0; i < newMaterials.Length; i++)
+                var materialLength = renderer.materials?.Length ?? 0;
+                var newMaterials = new Material[materialLength];
+                
+                for (var i = 0; i < materialLength; i++)
                 {
                     newMaterials[i] = Instantiate(outlineMaterial);
                 }
-                renderer.materials = new Material[renderer.materials.Length];
+                
+                renderer.materials = new Material[materialLength];
             }
         }
 
@@ -236,5 +248,8 @@ namespace MinimumQuotaFinder
         
         [InputAction("<Keyboard>/j", Name = "Reload highlight shaders")]
         public InputAction ReloadShaderKey { get; set; }
+        
+        [InputAction("<Keyboard>/k", Name = "Spawn scrap")]
+        public InputAction SpawnScrap { get; set; }
     }
 }
