@@ -51,12 +51,16 @@ namespace MinimumQuotaFinder
 
         public void CreateShader()
         {
-            var bundlePath = Path.Join(Path.GetDirectoryName(Info.Location), "outlineshader.shader");
+            var bundlePath = Path.Join(Path.GetDirectoryName(Info.Location), "AssetBundles/wireframe");
             var shaderBundle = AssetBundle.LoadFromFile(bundlePath);
-            Logger.LogInfo(shaderBundle.GetAllAssetNames());
-            var shader = shaderBundle.LoadAsset<Shader>("outlineshader.shader");
+            foreach (var name in shaderBundle.GetAllAssetNames())
+            {
+                Logger.LogInfo(name);
+            }
+            var shader = shaderBundle.LoadAsset<Shader>("assets/shader.shader");
             Logger.LogInfo(shader);
             outlineMaterial = new Material(shader);
+            // outlineMaterial = shaderBundle.LoadAsset<Material>("goldwireframe.mat");
             shaderBundle.Unload(false);
         }
 
@@ -158,8 +162,6 @@ namespace MinimumQuotaFinder
         {
             if (!highlightContext.performed) return; 
             // Add more context checks if desired
-            
-            Logger.LogInfo("Button pressed!");
 
             toggled = !toggled;
  
@@ -169,21 +171,16 @@ namespace MinimumQuotaFinder
                 return;
             if (!HUDManager.Instance.CanPlayerScan() || HUDManager.Instance.playerPingingScan > -0.5f)
                 return;
-            // Only allow this special scan to work while inside the ship.
-            // if (!StartOfRound.Instance.inShipPhase && !GameNetworkManager.Instance.localPlayerController.isInHangarShipRoom)
-            //     return;
             // If on company moon
             if (StartOfRound.Instance.currentLevelID != 3)
             {
                 HUDManager.Instance.DisplayTip("MinimumQuotaFinder","Not on the company moon.");
                 return;
             }
-            
-            List<GrabbableObject> toHighlight = GetListToHighlight();
-            // TODO: Highlight scrap
 
             if (toggled)
             {
+                List<GrabbableObject> toHighlight = GetListToHighlight();
                 HighlightObjects(toHighlight);
             }
             else
@@ -194,7 +191,7 @@ namespace MinimumQuotaFinder
         
         private List<GrabbableObject> GetAllShipScrap()
         {
-            GameObject ship = GameObject.Find("/Environment/HangarShip");
+            GameObject ship = GameObject.Find("/Environment");
             // Get all objects that is scrap within the ship
             // At the counter, only values of scrap items are added to company credit
             List<GrabbableObject> allScrap = ship.GetComponentsInChildren<GrabbableObject>()
@@ -222,7 +219,7 @@ namespace MinimumQuotaFinder
                     newMaterials[i] = Instantiate(outlineMaterial);
                 }
                 
-                renderer.materials = new Material[materialLength];
+                renderer.materials = newMaterials;
             }
         }
 
@@ -244,7 +241,7 @@ namespace MinimumQuotaFinder
     
     public class HighlightInputClass : LcInputActions 
     {
-        [InputAction("<Keyboard>/h", Name = "Calculate and highlight minimum scrap needed to reach quota")]
+        [InputAction("<Keyboard>/h", Name = "Toggle scrap highlight")]
         public InputAction HighlightKey { get; set; }
         
         [InputAction("<Keyboard>/j", Name = "Reload highlight shaders")]
