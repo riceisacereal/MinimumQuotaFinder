@@ -161,12 +161,7 @@ namespace MinimumQuotaFinder
         public void OnHighlightKeyPressed(InputAction.CallbackContext highlightContext)
         {
             if (!highlightContext.performed) return; 
-            // Add more context checks if desired
 
-            toggled = !toggled;
- 
-            // Your executing code here
-            
             if (GameNetworkManager.Instance.localPlayerController == null)
                 return;
             if (!HUDManager.Instance.CanPlayerScan() || HUDManager.Instance.playerPingingScan > -0.5f)
@@ -178,6 +173,7 @@ namespace MinimumQuotaFinder
                 return;
             }
 
+            toggled = !toggled;
             if (toggled)
             {
                 List<GrabbableObject> toHighlight = GetListToHighlight();
@@ -237,6 +233,12 @@ namespace MinimumQuotaFinder
                 highlightedObjects.Remove(obj);
             }
         }
+    }
+
+    public class MemCell
+    {
+        private int max;
+        private HashSet<GrabbableObject> included;
     }
     
     public class HighlightInputClass : LcInputActions 
