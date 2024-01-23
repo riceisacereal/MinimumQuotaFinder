@@ -64,40 +64,20 @@ namespace MinimumQuotaFinder
             shaderBundle.Unload(false);
         }
 
-        private List<GrabbableObject> GetExcludedList(int[,] mem, List<GrabbableObject> allSchipScrap)
-        {
-            List<GrabbableObject> excludedScrap = new List<GrabbableObject>();
-            
-            int y = mem.GetLength(0) - 1;
-            int x = mem.GetLength(1) - 1;
-            while (x >= 0 && y >= 1)
-            {
-                int currentScrapValue = allSchipScrap[y - 1].scrapValue;
-                
-                // Excluded
-                if (mem[y, x] == mem[y - 1, x])
-                {
-                    y--;
-                }
-                else if (mem[y, x] == mem[y - 1, x - currentScrapValue] + currentScrapValue)
-                {
-                    excludedScrap.Add(allSchipScrap[y - 1]);
-                    y--;
-                    x -= currentScrapValue;
-                }
-            }
-
-            return excludedScrap;
-        }
-
         private List<GrabbableObject> DoDynamicProgramming(int sold, int quota, List<GrabbableObject> allShipScrap)
         {
             // Subset sum/knapsack on total value of all scraps - quota + already paid quota
             int numItems = allShipScrap.Count;
             int inverseTarget = allShipScrap.Sum(scrap => scrap.scrapValue) - (quota - sold);
 
-            int[,] mem = new int[numItems + 1, inverseTarget + 1];
-
+            MemCell[,] mem = new MemCell[2, inverseTarget + 1];
+            // int[,] mem = new int[numItems + 1, inverseTarget + 1];
+            for (int i = 0; i < mem.GetLength(1); i++)
+            {
+                mem[0, i] = new MemCell(0, new List<GrabbableObject>());
+            }
+            
+            
             for (int y = 1; y <= numItems; y++)
             {
                 for (int x = 0; x <= inverseTarget; x++)
@@ -105,18 +85,31 @@ namespace MinimumQuotaFinder
                     int currentScrapValue = allShipScrap[y - 1].scrapValue;
                     if (x < currentScrapValue)
                     {
-                        mem[y, x] = mem[y - 1, x];
+                        mem[1, x] = mem[0, x];
                         continue;
                     }
 
-                    int include = currentScrapValue + mem[y - 1, x - currentScrapValue];
-                    int exclude = mem[y - 1, x];
+                    int include = currentScrapValue + mem[0, x - currentScrapValue].Max;
+                    int exclude = mem[0, x].Max;
 
-                    mem[y, x] = System.Math.Max(include, exclude);
+                    if (include > exclude)
+                    {
+                        mem[1, x] = new MemCell(include, mem[0, x - currentScrapValue].Included);
+                    }
+                    else
+                    {
+                        mem[1, x] = mem[0, x];
+                    }
+                }
+                
+                // Shift values up
+                for (int x = 0; x <= inverseTarget; x++)
+                {
+                    mem[0, x] = mem[1, x];
                 }
             }
 
-            return GetExcludedList(mem, allShipScrap);
+            return mem[mem.GetLength(0) - 1, mem.GetLength(1) - 1].Included;
         }
 
         private List<GrabbableObject> GetListToHighlight()
@@ -242,8 +235,14 @@ namespace MinimumQuotaFinder
 
     public class MemCell
     {
-        private int max;
-        private HashSet<GrabbableObject> included;
+        public int Max { get; }
+        public List<GrabbableObject> Included { get; }
+
+        public MemCell(int max, List<GrabbableObject> setToCopy)
+        {
+            Max = max;
+            Included = new List<GrabbableObject>(setToCopy);
+        }
     }
     
     public class HighlightInputClass : LcInputActions 
