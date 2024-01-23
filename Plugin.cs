@@ -64,7 +64,7 @@ namespace MinimumQuotaFinder
             shaderBundle.Unload(false);
         }
 
-        private List<GrabbableObject> DoDynamicProgramming(int sold, int quota, List<GrabbableObject> allShipScrap)
+        private HashSet<GrabbableObject> DoDynamicProgramming(int sold, int quota, List<GrabbableObject> allShipScrap)
         {
             // Subset sum/knapsack on total value of all scraps - quota + already paid quota
             int numItems = allShipScrap.Count;
@@ -74,7 +74,7 @@ namespace MinimumQuotaFinder
             // int[,] mem = new int[numItems + 1, inverseTarget + 1];
             for (int i = 0; i < mem.GetLength(1); i++)
             {
-                mem[0, i] = new MemCell(0, new List<GrabbableObject>());
+                mem[0, i] = new MemCell(0, new HashSet<GrabbableObject>());
             }
             
             for (int y = 1; y <= numItems; y++)
@@ -93,7 +93,7 @@ namespace MinimumQuotaFinder
 
                     if (include > exclude)
                     {
-                        List<GrabbableObject> newList = new List<GrabbableObject>(
+                        HashSet<GrabbableObject> newList = new HashSet<GrabbableObject>(
                             mem[0, x - currentScrapValue].Included.Append(allShipScrap[y - 1]));
                         mem[1, x] = new MemCell(include, newList);
                     }
@@ -137,7 +137,7 @@ namespace MinimumQuotaFinder
             }
             
             allShipScrap.Sort((x, y) => x.NetworkObjectId.CompareTo(y.NetworkObjectId));
-            List<GrabbableObject> excludedScrap = DoDynamicProgramming(sold, quota, allShipScrap);
+            HashSet<GrabbableObject> excludedScrap = DoDynamicProgramming(sold, quota, allShipScrap);
             List<GrabbableObject> toHighlight = new List<GrabbableObject>();
             foreach (GrabbableObject scrap in allShipScrap)
             {
@@ -237,9 +237,9 @@ namespace MinimumQuotaFinder
     public class MemCell
     {
         public int Max { get; }
-        public List<GrabbableObject> Included { get; }
+        public HashSet<GrabbableObject> Included { get; }
 
-        public MemCell(int max, List<GrabbableObject> included)
+        public MemCell(int max, HashSet<GrabbableObject> included)
         {
             Max = max;
             Included = included;
