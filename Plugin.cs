@@ -77,7 +77,6 @@ namespace MinimumQuotaFinder
                 mem[0, i] = new MemCell(0, new List<GrabbableObject>());
             }
             
-            
             for (int y = 1; y <= numItems; y++)
             {
                 for (int x = 0; x <= inverseTarget; x++)
@@ -94,7 +93,9 @@ namespace MinimumQuotaFinder
 
                     if (include > exclude)
                     {
-                        mem[1, x] = new MemCell(include, mem[0, x - currentScrapValue].Included);
+                        List<GrabbableObject> newList = new List<GrabbableObject>(
+                            mem[0, x - currentScrapValue].Included.Append(allShipScrap[y - 1]));
+                        mem[1, x] = new MemCell(include, newList);
                     }
                     else
                     {
@@ -238,10 +239,10 @@ namespace MinimumQuotaFinder
         public int Max { get; }
         public List<GrabbableObject> Included { get; }
 
-        public MemCell(int max, List<GrabbableObject> setToCopy)
+        public MemCell(int max, List<GrabbableObject> included)
         {
             Max = max;
-            Included = new List<GrabbableObject>(setToCopy);
+            Included = included;
         }
     }
     
