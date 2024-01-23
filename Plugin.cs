@@ -153,8 +153,13 @@ namespace MinimumQuotaFinder
                 }
             }
 
+            int sum = toHighlight.Sum(scrap => scrap.scrapValue);
+            int difference = (sold + sum) - quota;
+            string sign = difference > 0 ? "+" : "";
+            string colour = difference == 0 ? "#A5D971" : "#BA4B2B";
             HUDManager.Instance.DisplayTip("MinimumQuotaFinder",
-                $"Total value of optimal scrap combination found: {toHighlight.Sum(scrap => scrap.scrapValue)}.");
+                $"Total value of optimal scrap combination found: <b>{sum}</b>." +
+                $"Difference to quota: <color=\"{colour}\">{sign}{colour}</color>.");
             return toHighlight;
         }
 
@@ -166,7 +171,7 @@ namespace MinimumQuotaFinder
                 return;
             if (!HUDManager.Instance.CanPlayerScan() || HUDManager.Instance.playerPingingScan > -0.5f)
                 return;
-            // If on company moon
+            // If not on company moon
             if (StartOfRound.Instance.currentLevelID != 3)
             {
                 HUDManager.Instance.DisplayTip("MinimumQuotaFinder","Not on the company moon.");
