@@ -70,11 +70,11 @@ namespace MinimumQuotaFinder
             int numItems = allShipScrap.Count;
             int inverseTarget = allShipScrap.Sum(scrap => scrap.scrapValue) - (quota - sold);
 
-            MemCell[,] mem = new MemCell[2, inverseTarget + 1];
-            // int[,] mem = new int[numItems + 1, inverseTarget + 1];
-            for (int i = 0; i < mem.GetLength(1); i++)
+            MemCell[] prev = new MemCell[inverseTarget + 1];
+            MemCell[] current = new MemCell[inverseTarget + 1];
+            for (int i = 0; i < prev.Length; i++)
             {
-                mem[0, i] = new MemCell(0, new HashSet<GrabbableObject>());
+                prev[i] = new MemCell(0, new HashSet<GrabbableObject>());
             }
             
             for (int y = 1; y <= numItems; y++)
@@ -84,33 +84,28 @@ namespace MinimumQuotaFinder
                     int currentScrapValue = allShipScrap[y - 1].scrapValue;
                     if (x < currentScrapValue)
                     {
-                        mem[1, x] = mem[0, x];
+                        current[x] = prev[x];
                         continue;
                     }
 
-                    int include = currentScrapValue + mem[0, x - currentScrapValue].Max;
-                    int exclude = mem[0, x].Max;
+                    int include = currentScrapValue + prev[x - currentScrapValue].Max;
+                    int exclude = prev[x].Max;
 
                     if (include > exclude)
                     {
                         HashSet<GrabbableObject> newList = new HashSet<GrabbableObject>(
-                            mem[0, x - currentScrapValue].Included.Append(allShipScrap[y - 1]));
-                        mem[1, x] = new MemCell(include, newList);
+                            prev[x - currentScrapValue].Included.Append(allShipScrap[y - 1]));
+                        current[x] = new MemCell(include, newList);
                     }
                     else
                     {
-                        mem[1, x] = mem[0, x];
+                        current[x] = prev[x];
                     }
                 }
-                
-                // Shift values up
-                for (int x = 0; x <= inverseTarget; x++)
-                {
-                    mem[0, x] = mem[1, x];
-                }
+                prev = current;
             }
 
-            return mem[mem.GetLength(0) - 1, mem.GetLength(1) - 1].Included;
+            return current[current.Length].Included;
         }
 
         private List<GrabbableObject> GetListToHighlight()
