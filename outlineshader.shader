@@ -4,15 +4,21 @@
     {
         [PowerSlider(3.0)]
         _WireframeVal ("Edge width", Range(0., 0.5)) = 0.05
-        _EdgeColor ("Edge color", color) = (.102, .969, .141, 1.)
-        _MainColor ("Main Color", Color) = (.102, .969, .141, 0.1)
+        _EdgeColor ("Edge color", color) = (.102, .969, .141, 1.0)
+        _MainColor ("Main Color", Color) = (.102, .969, .141, 0.3)
     }
+
     SubShader
     {
-        Tags { "Queue"="Geometry" "RenderType"="Opaque" }
- 
+        
+        Tags { "Queue"="Transparent" "RenderType"="Transparent" }
         Pass
         {
+            LOD 100
+            ZWrite Off
+            Blend SrcAlpha OneMinusSrcAlpha
+            Cull Off
+
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
@@ -39,10 +45,19 @@
             }
  
             [maxvertexcount(3)]
-                        void geom(triangle v2g IN[3], inout TriangleStream<g2f> triStream)
+            void geom(triangle v2g IN[3], inout TriangleStream<g2f> triStream)
             {
                 float3 param = float3(0., 0., 0.);
+                float EdgeA = length(IN[0].worldPos - IN[1].worldPos);
+                float EdgeB = length(IN[1].worldPos - IN[2].worldPos);
+                float EdgeC = length(IN[2].worldPos - IN[0].worldPos);
  
+                if (EdgeA > EdgeB && EdgeA > EdgeC)
+                    param.y = 1.;
+                else if (EdgeB > EdgeC && EdgeB > EdgeA)
+                    param.x = 1.;
+                else
+                    param.z = 1.;
  
                 g2f o;
                 o.pos = mul(UNITY_MATRIX_VP, IN[0].worldPos);
@@ -63,8 +78,8 @@
             fixed4 frag(g2f i) : SV_Target
             {
                 if (!any(bool3(i.bary.x < _WireframeVal, i.bary.y < _WireframeVal, i.bary.z < _WireframeVal)))
-                    discard;
-                    //return _MainColor;
+                                //discard;
+                    return _MainColor;
  
                 return _EdgeColor;
             }

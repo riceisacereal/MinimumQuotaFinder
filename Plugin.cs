@@ -130,8 +130,8 @@ namespace MinimumQuotaFinder
                 return new List<GrabbableObject>();
             }
             
-            allShipScrap.Sort((x, y) => x.NetworkObjectId.CompareTo(y.NetworkObjectId));
-            HashSet<GrabbableObject> excludedScrap = DoDynamicProgramming(sold, quota, allShipScrap);
+            allScrap.Sort((x, y) => x.NetworkObjectId.CompareTo(y.NetworkObjectId));
+            HashSet<GrabbableObject> excludedScrap = DoDynamicProgramming(sold, quota, allScrap);
             List<GrabbableObject> toHighlight = new List<GrabbableObject>();
             foreach (GrabbableObject scrap in allScrap)
             {
