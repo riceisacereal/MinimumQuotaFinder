@@ -64,40 +64,19 @@ namespace MinimumQuotaFinder
             shaderBundle.Unload(false);
         }
 
-        private List<GrabbableObject> GetExcludedList(int[,] mem, List<GrabbableObject> allSchipScrap)
-        {
-            List<GrabbableObject> excludedScrap = new List<GrabbableObject>();
-            
-            int y = mem.GetLength(0) - 1;
-            int x = mem.GetLength(1) - 1;
-            while (x >= 0 && y >= 1)
-            {
-                int currentScrapValue = allSchipScrap[y - 1].scrapValue;
-                
-                // Excluded
-                if (mem[y, x] == mem[y - 1, x])
-                {
-                    y--;
-                }
-                else if (mem[y, x] == mem[y - 1, x - currentScrapValue] + currentScrapValue)
-                {
-                    excludedScrap.Add(allSchipScrap[y - 1]);
-                    y--;
-                    x -= currentScrapValue;
-                }
-            }
-
-            return excludedScrap;
-        }
-
         private List<GrabbableObject> DoDynamicProgramming(int sold, int quota, List<GrabbableObject> allShipScrap)
         {
             // Subset sum/knapsack on total value of all scraps - quota + already paid quota
             int numItems = allShipScrap.Count;
             int inverseTarget = allShipScrap.Sum(scrap => scrap.scrapValue) - (quota - sold);
 
-            int[,] mem = new int[numItems + 1, inverseTarget + 1];
-
+            MemCell[,] mem = new MemCell[2, inverseTarget + 1];
+            // int[,] mem = new int[numItems + 1, inverseTarget + 1];
+            for (int i = 0; i < mem.GetLength(1); i++)
+            {
+                mem[0, i] = new MemCell(0, new List<GrabbableObject>());
+            }
+            
             for (int y = 1; y <= numItems; y++)
             {
                 for (int x = 0; x <= inverseTarget; x++)
@@ -105,36 +84,50 @@ namespace MinimumQuotaFinder
                     int currentScrapValue = allShipScrap[y - 1].scrapValue;
                     if (x < currentScrapValue)
                     {
-                        mem[y, x] = mem[y - 1, x];
+                        mem[1, x] = mem[0, x];
                         continue;
                     }
 
-                    int include = currentScrapValue + mem[y - 1, x - currentScrapValue];
-                    int exclude = mem[y - 1, x];
+                    int include = currentScrapValue + mem[0, x - currentScrapValue].Max;
+                    int exclude = mem[0, x].Max;
 
-                    mem[y, x] = System.Math.Max(include, exclude);
+                    if (include > exclude)
+                    {
+                        List<GrabbableObject> newList = new List<GrabbableObject>(
+                            mem[0, x - currentScrapValue].Included.Append(allShipScrap[y - 1]));
+                        mem[1, x] = new MemCell(include, newList);
+                    }
+                    else
+                    {
+                        mem[1, x] = mem[0, x];
+                    }
+                }
+                
+                // Shift values up
+                for (int x = 0; x <= inverseTarget; x++)
+                {
+                    mem[0, x] = mem[1, x];
                 }
             }
 
-            return GetExcludedList(mem, allShipScrap);
+            return mem[mem.GetLength(0) - 1, mem.GetLength(1) - 1].Included;
         }
 
-        private List<GrabbableObject> GetListToHighlight()
+        private List<GrabbableObject> GetListToHighlight(List<GrabbableObject> allScrap)
         {
             // Retrieve value of currently sold scrap and quota
             int sold = TimeOfDay.Instance.quotaFulfilled;
             int quota = TimeOfDay.Instance.profitQuota;
             
             // Retrieve all scrap in ship
-            List<GrabbableObject> allShipScrap = GetAllShipScrap();
             // If no scrap in ship
-            if (allShipScrap == null || allShipScrap.Count == 0)
+            if (allScrap == null || allScrap.Count == 0)
             {
                 HUDManager.Instance.DisplayTip("MinimumQuotaFinder","No scrap detected within the ship.");
                 return new List<GrabbableObject>();
             }
             // If total value of scrap isn't above quota
-            int sumScrapValue = allShipScrap.Sum(scrap => scrap.scrapValue);
+            int sumScrapValue = allScrap.Sum(scrap => scrap.scrapValue);
             if (sold + sumScrapValue < quota)
             {
                 HUDManager.Instance.DisplayTip("MinimumQuotaFinder",
@@ -142,10 +135,10 @@ namespace MinimumQuotaFinder
                 return new List<GrabbableObject>();
             }
             
-            allShipScrap.Sort((x, y) => x.NetworkObjectId.CompareTo(y.NetworkObjectId));
-            List<GrabbableObject> excludedScrap = DoDynamicProgramming(sold, quota, allShipScrap);
+            allScrap.Sort((x, y) => x.NetworkObjectId.CompareTo(y.NetworkObjectId));
+            List<GrabbableObject> excludedScrap = DoDynamicProgramming(sold, quota, allScrap);
             List<GrabbableObject> toHighlight = new List<GrabbableObject>();
-            foreach (GrabbableObject scrap in allShipScrap)
+            foreach (GrabbableObject scrap in allScrap)
             {
                 if (!excludedScrap.Contains(scrap))
                 {
@@ -171,17 +164,11 @@ namespace MinimumQuotaFinder
                 return;
             if (!HUDManager.Instance.CanPlayerScan() || HUDManager.Instance.playerPingingScan > -0.5f)
                 return;
-            // If not on company moon
-            if (StartOfRound.Instance.currentLevelID != 3)
-            {
-                HUDManager.Instance.DisplayTip("MinimumQuotaFinder","Not on the company moon.");
-                return;
-            }
 
             toggled = !toggled;
             if (toggled)
             {
-                List<GrabbableObject> toHighlight = GetListToHighlight();
+                List<GrabbableObject> toHighlight = GetListToHighlight(GetAllScrap(StartOfRound.Instance.currentLevelID));
                 HighlightObjects(toHighlight);
             }
             else
@@ -190,12 +177,22 @@ namespace MinimumQuotaFinder
             }
         }
         
-        private List<GrabbableObject> GetAllShipScrap()
+        private List<GrabbableObject> GetAllScrap(int level)
         {
-            GameObject ship = GameObject.Find("/Environment");
-            // Get all objects that is scrap within the ship
+            GameObject scope;
+            if (level == 3)
+            {
+                // Scan all scrap in the environment when on the moon
+                scope = GameObject.Find("/Environment");
+            }
+            else
+            {
+                // Scan only scrap in the ship when elsewhere
+                scope = GameObject.Find("/Environment/HangarShip");
+            }
+            // Get all objects that are scrap
             // At the counter, only values of scrap items are added to company credit
-            List<GrabbableObject> allScrap = ship.GetComponentsInChildren<GrabbableObject>()
+            List<GrabbableObject> allScrap = scope.GetComponentsInChildren<GrabbableObject>()
                 .Where(obj => obj.itemProperties.isScrap).ToList();
             
             return allScrap;
@@ -242,8 +239,14 @@ namespace MinimumQuotaFinder
 
     public class MemCell
     {
-        private int max;
-        private HashSet<GrabbableObject> included;
+        public int Max { get; }
+        public List<GrabbableObject> Included { get; }
+
+        public MemCell(int max, List<GrabbableObject> included)
+        {
+            Max = max;
+            Included = included;
+        }
     }
     
     public class HighlightInputClass : LcInputActions 
