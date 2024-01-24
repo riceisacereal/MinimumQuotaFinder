@@ -57,18 +57,18 @@ namespace MinimumQuotaFinder
             {
                 Logger.LogInfo(name);
             }
-            var shader = shaderBundle.LoadAsset<Shader>("assets/shader.shader");
+            var shader = shaderBundle.LoadAsset<Shader>("assets/wireframeshader.shader");
             Logger.LogInfo(shader);
             outlineMaterial = new Material(shader);
             // outlineMaterial = shaderBundle.LoadAsset<Material>("goldwireframe.mat");
             shaderBundle.Unload(false);
         }
 
-        private HashSet<GrabbableObject> DoDynamicProgramming(int sold, int quota, List<GrabbableObject> allShipScrap)
+        private HashSet<GrabbableObject> DoDynamicProgramming(int sold, int quota, List<GrabbableObject> allScrap)
         {
             // Subset sum/knapsack on total value of all scraps - quota + already paid quota
-            int numItems = allShipScrap.Count;
-            int inverseTarget = allShipScrap.Sum(scrap => scrap.scrapValue) - (quota - sold);
+            int numItems = allScrap.Count;
+            int inverseTarget = allScrap.Sum(scrap => scrap.scrapValue) - (quota - sold);
 
             MemCell[] prev = new MemCell[inverseTarget + 1];
             MemCell[] current = new MemCell[inverseTarget + 1];
@@ -81,7 +81,7 @@ namespace MinimumQuotaFinder
             {
                 for (int x = 0; x <= inverseTarget; x++)
                 {
-                    int currentScrapValue = allShipScrap[y - 1].scrapValue;
+                    int currentScrapValue = allScrap[y - 1].scrapValue;
                     if (x < currentScrapValue)
                     {
                         current[x] = prev[x];
@@ -94,7 +94,7 @@ namespace MinimumQuotaFinder
                     if (include > exclude)
                     {
                         HashSet<GrabbableObject> newList = new HashSet<GrabbableObject>(
-                            prev[x - currentScrapValue].Included.Append(allShipScrap[y - 1]));
+                            prev[x - currentScrapValue].Included.Append(allScrap[y - 1]));
                         current[x] = new MemCell(include, newList);
                     }
                     else
@@ -105,7 +105,7 @@ namespace MinimumQuotaFinder
                 prev = current;
             }
 
-            return current[current.Length].Included;
+            return current[current.Length - 1].Included;
         }
 
         private List<GrabbableObject> GetListToHighlight(List<GrabbableObject> allScrap)
@@ -113,6 +113,8 @@ namespace MinimumQuotaFinder
             // Retrieve value of currently sold scrap and quota
             int sold = TimeOfDay.Instance.quotaFulfilled;
             int quota = TimeOfDay.Instance.profitQuota;
+            
+            Logger.LogInfo(sold + " " + quota);
             
             // Retrieve all scrap in ship
             // If no scrap in ship
@@ -143,11 +145,11 @@ namespace MinimumQuotaFinder
 
             int sum = toHighlight.Sum(scrap => scrap.scrapValue);
             int difference = (sold + sum) - quota;
-            string sign = difference > 0 ? "+" : "";
-            string colour = difference == 0 ? "#A5D971" : "#BA4B2B";
+            // string sign = difference > 0 ? "\uff0b" : "";
+            string colour = difference == 0 ? "#A5D971" : "#992403";
             HUDManager.Instance.DisplayTip("MinimumQuotaFinder",
-                $"Total value of optimal scrap combination found: <b>{sum}</b>." +
-                $"Difference to quota: <color=\"{colour}\">{sign}{colour}</color>.");
+                $"Optimal scrap combination found: {sum + sold} ({sold} already sold). " +
+                $"<color={colour}>{difference}</color> over quota. ");
             return toHighlight;
         }
 
