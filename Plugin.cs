@@ -18,9 +18,9 @@ namespace MinimumQuotaFinder
         private int previousResult = -1;
         private List<GrabbableObject> previousInclude;
         private HashSet<GrabbableObject> previousExclude;
-        public Material outlineMaterial;
-        private Dictionary<GrabbableObject, Material[]> highlightedObjects = new();
-        private bool toggled;
+        public Material wireframeMaterial;
+        private Dictionary<GrabbableObject, Material[]> _highlightedObjects = new();
+        private bool _toggled;
         
         private void Awake()
         {
@@ -49,22 +49,17 @@ namespace MinimumQuotaFinder
             val.GetComponent<GrabbableObject>().fallTime = 0f;
             val.AddComponent<ScanNodeProperties>().scrapValue = 25;
             val.GetComponent<GrabbableObject>().SetScrapValue(25);
-            val.GetComponent<NetworkObject>().Spawn(false);
+            val.GetComponent<NetworkObject>().Spawn();
             print(val.GetComponent<GrabbableObject>().itemProperties.isScrap);
         }
 
         public void CreateShader()
         {
-            var bundlePath = Path.Join(Path.GetDirectoryName(Info.Location), "AssetBundles/wireframe");
-            var shaderBundle = AssetBundle.LoadFromFile(bundlePath);
-            foreach (var name in shaderBundle.GetAllAssetNames())
-            {
-                Logger.LogInfo(name);
-            }
-            var shader = shaderBundle.LoadAsset<Shader>("assets/wireframeshader.shader");
-            Logger.LogInfo(shader);
-            outlineMaterial = new Material(shader);
-            // outlineMaterial = shaderBundle.LoadAsset<Material>("goldwireframe.mat");
+            string bundlePath = Path.Join(Path.GetDirectoryName(Info.Location), "AssetBundles/wireframe");
+            AssetBundle shaderBundle = AssetBundle.LoadFromFile(bundlePath);
+            Shader shader = shaderBundle.LoadAsset<Shader>("assets/wireframeshader.shader");
+            
+            wireframeMaterial = new Material(shader);
             shaderBundle.Unload(false);
         }
 
@@ -109,7 +104,7 @@ namespace MinimumQuotaFinder
                 prev = current;
             }
 
-            return current[current.Length - 1].Included;
+            return current[^1].Included;
         }
 
         private bool SoldWrongScrap(List<GrabbableObject> allScrap)
@@ -169,16 +164,9 @@ namespace MinimumQuotaFinder
             allScrap.Sort((x, y) => x.NetworkObjectId.CompareTo(y.NetworkObjectId));
             HashSet<GrabbableObject> excludedScrap = DoDynamicProgramming(sold, quota, allScrap);
             previousExclude = excludedScrap;
-            List<GrabbableObject> toHighlight = new List<GrabbableObject>();
-            foreach (GrabbableObject scrap in allScrap)
-            {
-                if (!excludedScrap.Contains(scrap))
-                {
-                    toHighlight.Add(scrap);
-                }
-            }
+            List<GrabbableObject> toHighlight = allScrap.Where(scrap => !excludedScrap.Contains(scrap)).ToList();
             previousInclude = toHighlight;
-
+            
             int result = toHighlight.Sum(scrap => scrap.scrapValue) + sold;
             previousResult = result;
             int difference = result - quota;
@@ -198,8 +186,8 @@ namespace MinimumQuotaFinder
             if (!HUDManager.Instance.CanPlayerScan() || HUDManager.Instance.playerPingingScan > -0.5f)
                 return;
 
-            toggled = !toggled;
-            if (toggled)
+            _toggled = !_toggled;
+            if (_toggled)
             {
                 List<GrabbableObject> toHighlight =
                     GetListToHighlight(GetAllScrap(StartOfRound.Instance.currentLevelID));
@@ -211,19 +199,13 @@ namespace MinimumQuotaFinder
             }
         }
         
-        private List<GrabbableObject> GetAllScrap(int level)
+        private static List<GrabbableObject> GetAllScrap(int level)
         {
-            GameObject scope;
-            if (level == 3)
-            {
+            GameObject scope = GameObject.Find(level == 3 ?
                 // Scan all scrap in the environment when on the moon
-                scope = GameObject.Find("/Environment");
-            }
-            else
-            {
+                "/Environment" :
                 // Scan only scrap in the ship when elsewhere
-                scope = GameObject.Find("/Environment/HangarShip");
-            }
+                "/Environment/HangarShip");
             // Get all objects that are scrap
             // At the counter, only values of scrap items are added to company credit
             List<GrabbableObject> allScrap = scope.GetComponentsInChildren<GrabbableObject>()
@@ -234,21 +216,21 @@ namespace MinimumQuotaFinder
 
         private void HighlightObjects(List<GrabbableObject> objectsToHighlight)
         {
-            foreach (var obj in objectsToHighlight)
+            foreach (GrabbableObject obj in objectsToHighlight)
             {
                 Renderer renderer = obj.mainObjectRenderer;
                 
                 if (renderer == null) continue;
-                if (highlightedObjects.ContainsKey(obj)) continue;
+                if (_highlightedObjects.ContainsKey(obj)) continue;
                 
-                highlightedObjects.Add(obj, renderer.materials);
+                _highlightedObjects.Add(obj, renderer.materials);
 
-                var materialLength = renderer.materials?.Length ?? 0;
-                var newMaterials = new Material[materialLength];
+                int materialLength = renderer.materials?.Length ?? 0;
+                Material[] newMaterials = new Material[materialLength];
                 
-                for (var i = 0; i < materialLength; i++)
+                for (int i = 0; i < materialLength; i++)
                 {
-                    newMaterials[i] = Instantiate(outlineMaterial);
+                    newMaterials[i] = Instantiate(wireframeMaterial);
                 }
                 
                 renderer.materials = newMaterials;
@@ -257,16 +239,16 @@ namespace MinimumQuotaFinder
 
         private void UnhighlightObjects()
         {
-            var toRemove = new List<GrabbableObject>();
-            foreach (var objectEntry in highlightedObjects)
+            List<GrabbableObject> toRemove = new List<GrabbableObject>();
+            foreach (KeyValuePair<GrabbableObject, Material[]> objectEntry in _highlightedObjects)
             {
                 objectEntry.Key.mainObjectRenderer.materials = objectEntry.Value;
                 toRemove.Add(objectEntry.Key);
             }
 
-            foreach (var obj in toRemove)
+            foreach (GrabbableObject obj in toRemove)
             {
-                highlightedObjects.Remove(obj);
+                _highlightedObjects.Remove(obj);
             }
         }
     }
