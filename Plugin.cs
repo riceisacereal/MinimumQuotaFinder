@@ -14,6 +14,10 @@ namespace MinimumQuotaFinder
     public class MinimumQuotaFinder : BaseUnityPlugin
     {
         internal static HighlightInputClass InputActionsInstance = new();
+        private int previousQuota = -1;
+        private int previousResult = -1;
+        private List<GrabbableObject> previousInclude;
+        private HashSet<GrabbableObject> previousExclude;
         public Material outlineMaterial;
         private Dictionary<GrabbableObject, Material[]> highlightedObjects = new();
         private bool toggled;
@@ -108,13 +112,26 @@ namespace MinimumQuotaFinder
             return current[current.Length - 1].Included;
         }
 
+        private bool SoldWrongScrap(List<GrabbableObject> allScrap)
+        {
+            HashSet<GrabbableObject> scrapSet = new HashSet<GrabbableObject>(allScrap);
+            foreach (GrabbableObject scrap in previousExclude)
+            {
+                // If they accidentally sold scrap that should be excluded
+                if (!scrapSet.Contains(scrap))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private List<GrabbableObject> GetListToHighlight(List<GrabbableObject> allScrap)
         {
             // Retrieve value of currently sold scrap and quota
             int sold = TimeOfDay.Instance.quotaFulfilled;
             int quota = TimeOfDay.Instance.profitQuota;
-            
-            Logger.LogInfo(sold + " " + quota);
             
             // Retrieve all scrap in ship
             // If no scrap in ship
@@ -123,6 +140,23 @@ namespace MinimumQuotaFinder
                 HUDManager.Instance.DisplayTip("MinimumQuotaFinder","No scrap detected within the ship.");
                 return new List<GrabbableObject>();
             }
+            
+            // Return old scan if quota is still the same
+            if (quota == previousQuota)
+            {
+                // If no wrong scrap was sold, filter out sold from previous combination and return
+                // Else recalculate
+                if (!SoldWrongScrap(allScrap))
+                {
+                    List<GrabbableObject> filtered = previousInclude.Where(allScrap.Contains).ToList();
+                    return filtered;
+                }
+            }
+            else
+            {
+                previousQuota = quota;
+            }
+            
             // If total value of scrap isn't above quota
             int sumScrapValue = allScrap.Sum(scrap => scrap.scrapValue);
             if (sold + sumScrapValue < quota)
@@ -134,6 +168,7 @@ namespace MinimumQuotaFinder
             
             allScrap.Sort((x, y) => x.NetworkObjectId.CompareTo(y.NetworkObjectId));
             HashSet<GrabbableObject> excludedScrap = DoDynamicProgramming(sold, quota, allScrap);
+            previousExclude = excludedScrap;
             List<GrabbableObject> toHighlight = new List<GrabbableObject>();
             foreach (GrabbableObject scrap in allScrap)
             {
@@ -142,13 +177,14 @@ namespace MinimumQuotaFinder
                     toHighlight.Add(scrap);
                 }
             }
+            previousInclude = toHighlight;
 
-            int sum = toHighlight.Sum(scrap => scrap.scrapValue);
-            int difference = (sold + sum) - quota;
-            // string sign = difference > 0 ? "\uff0b" : "";
+            int result = toHighlight.Sum(scrap => scrap.scrapValue) + sold;
+            previousResult = result;
+            int difference = result - quota;
             string colour = difference == 0 ? "#A5D971" : "#992403";
             HUDManager.Instance.DisplayTip("MinimumQuotaFinder",
-                $"Optimal scrap combination found: {sum + sold} ({sold} already sold). " +
+                $"Optimal scrap combination found: {result} ({sold} already sold). " +
                 $"<color={colour}>{difference}</color> over quota. ");
             return toHighlight;
         }
@@ -165,7 +201,8 @@ namespace MinimumQuotaFinder
             toggled = !toggled;
             if (toggled)
             {
-                List<GrabbableObject> toHighlight = GetListToHighlight(GetAllScrap(StartOfRound.Instance.currentLevelID));
+                List<GrabbableObject> toHighlight =
+                    GetListToHighlight(GetAllScrap(StartOfRound.Instance.currentLevelID));
                 HighlightObjects(toHighlight);
             }
             else
