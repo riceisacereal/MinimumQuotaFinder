@@ -123,6 +123,17 @@ namespace MinimumQuotaFinder
             return sum + sold == previousResult;
         }
 
+        private void DisplayCalculationResult(List<GrabbableObject> toHighlight, int sold, int quota)
+        {
+            int result = toHighlight.Sum(scrap => scrap.scrapValue) + sold;
+            previousResult = result;
+            int difference = result - quota;
+            string colour = difference == 0 ? "#A5D971" : "#992403";
+            HUDManager.Instance.DisplayTip("MinimumQuotaFinder",
+                $"Optimal scrap combination found: {result} ({sold} already sold). " +
+                $"<color={colour}>{difference}</color> over quota. ");
+        }
+
         private List<GrabbableObject> GetListToHighlight(List<GrabbableObject> allScrap)
         {
             // Retrieve value of currently sold scrap and quota
@@ -145,6 +156,7 @@ namespace MinimumQuotaFinder
                 if (!SoldExcluded(allScrap) && !ThrewAwayIncluded(allScrap, sold))
                 {
                     List<GrabbableObject> filtered = previousInclude.Where(allScrap.Contains).ToList();
+                    DisplayCalculationResult(filtered, sold, quota);
                     return filtered;
                 }
             }
@@ -168,13 +180,7 @@ namespace MinimumQuotaFinder
             List<GrabbableObject> toHighlight = allScrap.Where(scrap => !excludedScrap.Contains(scrap)).ToList();
             previousInclude = toHighlight;
             
-            int result = toHighlight.Sum(scrap => scrap.scrapValue) + sold;
-            previousResult = result;
-            int difference = result - quota;
-            string colour = difference == 0 ? "#A5D971" : "#992403";
-            HUDManager.Instance.DisplayTip("MinimumQuotaFinder",
-                $"Optimal scrap combination found: {result} ({sold} already sold). " +
-                $"<color={colour}>{difference}</color> over quota. ");
+            DisplayCalculationResult(toHighlight, sold, quota);
             return toHighlight;
         }
 
@@ -240,17 +246,15 @@ namespace MinimumQuotaFinder
 
         private void UnhighlightObjects()
         {
-            List<GrabbableObject> toRemove = new List<GrabbableObject>();
             foreach (KeyValuePair<GrabbableObject, Material[]> objectEntry in _highlightedObjects)
             {
+                if (objectEntry.Key == null || objectEntry.Key.mainObjectRenderer == null ||
+                    objectEntry.Key.mainObjectRenderer.materials == null)
+                    continue;
                 objectEntry.Key.mainObjectRenderer.materials = objectEntry.Value;
-                toRemove.Add(objectEntry.Key);
             }
-
-            foreach (GrabbableObject obj in toRemove)
-            {
-                _highlightedObjects.Remove(obj);
-            }
+            
+            _highlightedObjects.Clear();
         }
     }
 
