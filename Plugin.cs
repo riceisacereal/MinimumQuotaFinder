@@ -107,19 +107,20 @@ namespace MinimumQuotaFinder
             return current[^1].Included;
         }
 
-        private bool SoldWrongScrap(List<GrabbableObject> allScrap)
+        private bool SoldExcluded(List<GrabbableObject> allScrap)
         {
-            HashSet<GrabbableObject> scrapSet = new HashSet<GrabbableObject>(allScrap);
-            foreach (GrabbableObject scrap in previousExclude)
-            {
-                // If they accidentally sold scrap that should be excluded
-                if (!scrapSet.Contains(scrap))
-                {
-                    return true;
-                }
-            }
+            HashSet<GrabbableObject> allScrapSet = new HashSet<GrabbableObject>(allScrap);
+            return previousExclude.Any(scrap => !allScrapSet.Contains(scrap));
+        }
 
-            return false;
+        private bool ThrewAwayIncluded(List<GrabbableObject> allScrap, int sold)
+        {
+            // Get list of scrap that still exists
+            HashSet<GrabbableObject> allScrapSet = new HashSet<GrabbableObject>(allScrap);
+            // If they don't add up to the previousResult anymore -> one scrap got lost
+            int sum = previousInclude.Where(scrap => allScrapSet.Contains(scrap)).Sum(scrap => scrap.scrapValue);
+
+            return sum + sold == previousResult;
         }
 
         private List<GrabbableObject> GetListToHighlight(List<GrabbableObject> allScrap)
@@ -136,12 +137,12 @@ namespace MinimumQuotaFinder
                 return new List<GrabbableObject>();
             }
             
-            // Return old scan if quota is still the same
-            if (quota == previousQuota)
+            // Return old scan if quota is still the same and result was optimal
+            if (quota == previousQuota && quota == previousResult)
             {
                 // If no wrong scrap was sold, filter out sold from previous combination and return
                 // Else recalculate
-                if (!SoldWrongScrap(allScrap))
+                if (!SoldExcluded(allScrap) && !ThrewAwayIncluded(allScrap, sold))
                 {
                     List<GrabbableObject> filtered = previousInclude.Where(allScrap.Contains).ToList();
                     return filtered;
