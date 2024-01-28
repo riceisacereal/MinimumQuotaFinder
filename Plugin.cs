@@ -101,7 +101,7 @@ namespace MinimumQuotaFinder
 
         }
         
-        private static List<GrabbableObject> GetAllScrap(int level)
+        private List<GrabbableObject> GetAllScrap(int level)
         {
             const float minimumHeight = -30f;
             GameObject scope = GameObject.Find(level == 3 ?
@@ -109,10 +109,18 @@ namespace MinimumQuotaFinder
                 "/Environment" :
                 // Scan only scrap in the ship when elsewhere
                 "/Environment/HangarShip");
+
             // Get all objects that are scrap
             // At the counter, only values of scrap items are added to company credit
             List<GrabbableObject> allScrap = scope.GetComponentsInChildren<GrabbableObject>()
                 .Where(obj => obj.itemProperties.isScrap && obj.transform.position.y > minimumHeight).ToList();
+            
+            DepositItemsDesk desk = FindObjectOfType<DepositItemsDesk>();
+            if (desk != null)
+            {
+                allScrap.AddRange(desk.deskObjectsContainer.GetComponentsInChildren<GrabbableObject>()
+                    .Where(obj => obj.itemProperties.isScrap && obj.transform.position.y > minimumHeight).ToList());
+            }
             
             return allScrap;
         }
@@ -256,7 +264,7 @@ namespace MinimumQuotaFinder
                 $"<color={colour}>{difference}</color> over quota. ");
         }
 
-        private static IEnumerator DoDynamicProgrammingCoroutine(List<GrabbableObject> allScrap, int sold, int quota, HashSet<GrabbableObject> excludedScrap)
+        private IEnumerator DoDynamicProgrammingCoroutine(List<GrabbableObject> allScrap, int sold, int quota, HashSet<GrabbableObject> excludedScrap)
         {
             // Subset sum/knapsack on total value of all scraps - quota + already paid quota
             int numItems = allScrap.Count;
