@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
@@ -20,7 +21,8 @@ namespace MinimumQuotaFinder
         private HashSet<GrabbableObject> previousExclude;
         public Material wireframeMaterial;
         private Dictionary<GrabbableObject, Material[]> _highlightedObjects = new();
-        private bool _toggled;
+        private bool _toggled = false;
+        private bool _highlightLock = false;
         
         private void Awake()
         {
@@ -40,6 +42,18 @@ namespace MinimumQuotaFinder
         public void ReloadShader(InputAction.CallbackContext reloadContext)
         {
             CreateShader();
+            // GameObject scope = GameObject.Find(
+            //     // Scan all scrap in the environment when on the moon
+            //     "/Environment/HangarShip");
+            // // Get all objects that are scrap
+            // // At the counter, only values of scrap items are added to company credit
+            // List<GrabbableObject> allScrap = scope.GetComponentsInChildren<GrabbableObject>()
+            //     .Where(obj => obj.itemProperties.isScrap).ToList();
+            // allScrap.ForEach(o => o.Update());
+            // allScrap.Sort((o1, o2) => o1.transform.position.y.CompareTo(o2.transform.position.y));
+            // if (allScrap.Count <= 0) return;
+            // Transform transform = allScrap[0].transform;
+            // if (transform != null) Logger.LogInfo(transform.position.y);
         }
 
         public void SpawnScrap(InputAction.CallbackContext spawnContext)
@@ -62,8 +76,185 @@ namespace MinimumQuotaFinder
             wireframeMaterial = new Material(shader);
             shaderBundle.Unload(false);
         }
+        
+        public void OnHighlightKeyPressed(InputAction.CallbackContext highlightContext)
+        {
+            if (_highlightLock)
+            {
+                return;
+            }
 
-        private HashSet<GrabbableObject> DoDynamicProgramming(int sold, int quota, List<GrabbableObject> allScrap)
+            _highlightLock = true;
+
+            if (!highlightContext.performed || GameNetworkManager.Instance.localPlayerController == null)
+            {
+                _highlightLock = false;
+                return;
+            } 
+            
+            if (!HUDManager.Instance.CanPlayerScan() || HUDManager.Instance.playerPingingScan > -0.5f)
+            {
+                _highlightLock = false;
+                return;
+            }
+
+            _toggled = !_toggled;
+            if (_toggled)
+            {
+                // Logger.LogInfo("Previous Result: " + previousResult);
+                List<GrabbableObject> allScrap = GetAllScrap(StartOfRound.Instance.currentLevelID);
+                GameNetworkManager.Instance.StartCoroutine(HighlightObjectCoroutine(allScrap));
+            }
+            else
+            {
+                UnhighlightObjects();
+                _highlightLock = false;
+            }
+
+        }
+        
+        private static List<GrabbableObject> GetAllScrap(int level)
+        {
+            const float minimumHeight = -30f;
+            GameObject scope = GameObject.Find(level == 3 ?
+                // Scan all scrap in the environment when on the moon
+                "/Environment" :
+                // Scan only scrap in the ship when elsewhere
+                "/Environment/HangarShip");
+            // Get all objects that are scrap
+            // At the counter, only values of scrap items are added to company credit
+            List<GrabbableObject> allScrap = scope.GetComponentsInChildren<GrabbableObject>()
+                .Where(obj => obj.itemProperties.isScrap && obj.transform.position.y > minimumHeight).ToList();
+            
+            return allScrap;
+        }
+        
+        IEnumerator HighlightObjectCoroutine(List<GrabbableObject> allScrap)
+        {
+            List<GrabbableObject> toHighlight = new List<GrabbableObject>();
+            yield return GameNetworkManager.Instance.StartCoroutine(GetListToHighlight(allScrap, toHighlight));
+            if (toHighlight.Count == 0)
+            {
+                _toggled = false;
+            }
+            else
+            {
+                HighlightObjects(toHighlight);
+            }
+            _highlightLock = false;
+        }
+        
+        private void HighlightObjects(List<GrabbableObject> objectsToHighlight)
+        {
+            foreach (GrabbableObject obj in objectsToHighlight)
+            {
+                Renderer renderer = obj.mainObjectRenderer;
+                
+                if (renderer == null) continue;
+                if (_highlightedObjects.ContainsKey(obj)) continue;
+                
+                _highlightedObjects.Add(obj, renderer.materials);
+
+                int materialLength = renderer.materials?.Length ?? 0;
+                Material[] newMaterials = new Material[materialLength];
+                
+                for (int i = 0; i < materialLength; i++)
+                {
+                    newMaterials[i] = Instantiate(wireframeMaterial);
+                }
+                
+                renderer.materials = newMaterials;
+            }
+        }
+        
+        private void UnhighlightObjects()
+        {
+            foreach (KeyValuePair<GrabbableObject, Material[]> objectEntry in _highlightedObjects)
+            {
+                if (objectEntry.Key == null || objectEntry.Key.mainObjectRenderer == null ||
+                    objectEntry.Key.mainObjectRenderer.materials == null)
+                    continue;
+                objectEntry.Key.mainObjectRenderer.materials = objectEntry.Value;
+            }
+            
+            _highlightedObjects.Clear();
+        }
+        
+        IEnumerator GetListToHighlight(List<GrabbableObject> allScrap, List<GrabbableObject> toHighlight)
+        {
+            // Retrieve value of currently sold scrap and quota
+            int sold = TimeOfDay.Instance.quotaFulfilled;
+            int quota = TimeOfDay.Instance.profitQuota;
+            
+            // Retrieve all scrap in ship
+            // If no scrap in ship
+            if (allScrap == null || allScrap.Count == 0)
+            {
+                HUDManager.Instance.DisplayTip("MinimumQuotaFinder","No scrap detected within the ship.");
+                yield break;
+            }
+            
+            // Return old scan if quota is still the same
+            
+            if (quota == previousQuota && !SoldExcluded(allScrap) && !ThrewAwayIncluded(allScrap, sold))
+            {
+                // If no wrong scrap was sold, filter out sold from previous combination and return
+                // Else recalculate
+                toHighlight.AddRange(previousInclude.Where(allScrap.Contains).ToList());
+                DisplayCalculationResult(toHighlight, sold, quota);
+                yield return toHighlight;
+            }
+            
+            previousQuota = quota;
+            
+            // If total value of scrap isn't above quota
+            int sumScrapValue = allScrap.Sum(scrap => scrap.scrapValue);
+            if (sold + sumScrapValue < quota)
+            {
+                HUDManager.Instance.DisplayTip("MinimumQuotaFinder",
+                    $"Not enough scrap to reach quota ({sumScrapValue} < {quota - sold}). Sell everything.");
+                yield break;
+            }
+            
+            allScrap.Sort((x, y) => x.NetworkObjectId.CompareTo(y.NetworkObjectId));
+            HashSet<GrabbableObject> excludedScrap = new HashSet<GrabbableObject>();
+            yield return GameNetworkManager.Instance.StartCoroutine(DoDynamicProgrammingCoroutine(allScrap, sold, quota, excludedScrap));
+            Logger.LogInfo("Count of excluded: " + excludedScrap.Count);
+            previousExclude = excludedScrap;
+            toHighlight.AddRange(allScrap.Where(scrap => !excludedScrap.Contains(scrap)).ToList());
+            previousInclude = toHighlight;
+            
+            DisplayCalculationResult(toHighlight, sold, quota);
+        }
+        
+        private bool SoldExcluded(List<GrabbableObject> allScrap)
+        {
+            HashSet<GrabbableObject> allScrapSet = new HashSet<GrabbableObject>(allScrap);
+            return previousExclude.Any(scrap => !allScrapSet.Contains(scrap));
+        }
+
+        private bool ThrewAwayIncluded(List<GrabbableObject> allScrap, int sold)
+        {
+            // Get list of scrap that still exists
+            HashSet<GrabbableObject> allScrapSet = new HashSet<GrabbableObject>(allScrap);
+            // If they don't add up to the previousResult anymore -> one scrap got lost
+            int sum = previousInclude.Where(scrap => allScrapSet.Contains(scrap)).Sum(scrap => scrap.scrapValue);
+
+            return sum + sold == previousResult;
+        }
+        
+        private void DisplayCalculationResult(List<GrabbableObject> toHighlight, int sold, int quota)
+        {
+            int result = toHighlight.Sum(scrap => scrap.scrapValue) + sold;
+            previousResult = result;
+            int difference = result - quota;
+            string colour = difference == 0 ? "#A5D971" : "#992403";
+            HUDManager.Instance.DisplayTip("MinimumQuotaFinder",
+                $"Optimal scrap combination found: {result} ({sold} already sold). " +
+                $"<color={colour}>{difference}</color> over quota. ");
+        }
+
+        IEnumerator DoDynamicProgrammingCoroutine(List<GrabbableObject> allScrap, int sold, int quota, HashSet<GrabbableObject> excludedScrap)
         {
             // Subset sum/knapsack on total value of all scraps - quota + already paid quota
             int numItems = allScrap.Count;
@@ -75,6 +266,9 @@ namespace MinimumQuotaFinder
             {
                 prev[i] = new MemCell(0, new HashSet<GrabbableObject>());
             }
+            
+            int calculations = 0;
+            const int THRESHOLD = 300000;
             
             for (int y = 1; y <= numItems; y++)
             {
@@ -102,159 +296,17 @@ namespace MinimumQuotaFinder
                     }
                 }
                 prev = current;
-            }
-
-            return current[^1].Included;
-        }
-
-        private bool SoldExcluded(List<GrabbableObject> allScrap)
-        {
-            HashSet<GrabbableObject> allScrapSet = new HashSet<GrabbableObject>(allScrap);
-            return previousExclude.Any(scrap => !allScrapSet.Contains(scrap));
-        }
-
-        private bool ThrewAwayIncluded(List<GrabbableObject> allScrap, int sold)
-        {
-            // Get list of scrap that still exists
-            HashSet<GrabbableObject> allScrapSet = new HashSet<GrabbableObject>(allScrap);
-            // If they don't add up to the previousResult anymore -> one scrap got lost
-            int sum = previousInclude.Where(scrap => allScrapSet.Contains(scrap)).Sum(scrap => scrap.scrapValue);
-
-            return sum + sold == previousResult;
-        }
-
-        private void DisplayCalculationResult(List<GrabbableObject> toHighlight, int sold, int quota)
-        {
-            int result = toHighlight.Sum(scrap => scrap.scrapValue) + sold;
-            previousResult = result;
-            int difference = result - quota;
-            string colour = difference == 0 ? "#A5D971" : "#992403";
-            HUDManager.Instance.DisplayTip("MinimumQuotaFinder",
-                $"Optimal scrap combination found: {result} ({sold} already sold). " +
-                $"<color={colour}>{difference}</color> over quota. ");
-        }
-
-        private List<GrabbableObject> GetListToHighlight(List<GrabbableObject> allScrap)
-        {
-            // Retrieve value of currently sold scrap and quota
-            int sold = TimeOfDay.Instance.quotaFulfilled;
-            int quota = TimeOfDay.Instance.profitQuota;
-            
-            // Retrieve all scrap in ship
-            // If no scrap in ship
-            if (allScrap == null || allScrap.Count == 0)
-            {
-                HUDManager.Instance.DisplayTip("MinimumQuotaFinder","No scrap detected within the ship.");
-                return new List<GrabbableObject>();
-            }
-            
-            // Return old scan if quota is still the same and result was optimal
-            if (quota == previousQuota && quota == previousResult)
-            {
-                // If no wrong scrap was sold, filter out sold from previous combination and return
-                // Else recalculate
-                if (!SoldExcluded(allScrap) && !ThrewAwayIncluded(allScrap, sold))
+                
+                calculations += inverseTarget;
+                if (calculations > THRESHOLD)
                 {
-                    List<GrabbableObject> filtered = previousInclude.Where(allScrap.Contains).ToList();
-                    DisplayCalculationResult(filtered, sold, quota);
-                    return filtered;
+                    yield return null;
+                    calculations = 0;
                 }
             }
-            else
-            {
-                previousQuota = quota;
-            }
             
-            // If total value of scrap isn't above quota
-            int sumScrapValue = allScrap.Sum(scrap => scrap.scrapValue);
-            if (sold + sumScrapValue < quota)
-            {
-                HUDManager.Instance.DisplayTip("MinimumQuotaFinder",
-                    $"Not enough scrap to reach quota ({sumScrapValue} < {quota - sold}). Sell everything.");
-                return new List<GrabbableObject>();
-            }
-            
-            allScrap.Sort((x, y) => x.NetworkObjectId.CompareTo(y.NetworkObjectId));
-            HashSet<GrabbableObject> excludedScrap = DoDynamicProgramming(sold, quota, allScrap);
-            previousExclude = excludedScrap;
-            List<GrabbableObject> toHighlight = allScrap.Where(scrap => !excludedScrap.Contains(scrap)).ToList();
-            previousInclude = toHighlight;
-            
-            DisplayCalculationResult(toHighlight, sold, quota);
-            return toHighlight;
-        }
-
-        public void OnHighlightKeyPressed(InputAction.CallbackContext highlightContext)
-        {
-            if (!highlightContext.performed) return; 
-
-            if (GameNetworkManager.Instance.localPlayerController == null)
-                return;
-            if (!HUDManager.Instance.CanPlayerScan() || HUDManager.Instance.playerPingingScan > -0.5f)
-                return;
-
-            _toggled = !_toggled;
-            if (_toggled)
-            {
-                List<GrabbableObject> toHighlight =
-                    GetListToHighlight(GetAllScrap(StartOfRound.Instance.currentLevelID));
-                HighlightObjects(toHighlight);
-            }
-            else
-            {
-                UnhighlightObjects();
-            }
-        }
-        
-        private static List<GrabbableObject> GetAllScrap(int level)
-        {
-            GameObject scope = GameObject.Find(level == 3 ?
-                // Scan all scrap in the environment when on the moon
-                "/Environment" :
-                // Scan only scrap in the ship when elsewhere
-                "/Environment/HangarShip");
-            // Get all objects that are scrap
-            // At the counter, only values of scrap items are added to company credit
-            List<GrabbableObject> allScrap = scope.GetComponentsInChildren<GrabbableObject>()
-                .Where(obj => obj.itemProperties.isScrap).ToList();
-            
-            return allScrap;
-        }
-
-        private void HighlightObjects(List<GrabbableObject> objectsToHighlight)
-        {
-            foreach (GrabbableObject obj in objectsToHighlight)
-            {
-                Renderer renderer = obj.mainObjectRenderer;
-                
-                if (renderer == null) continue;
-                if (_highlightedObjects.ContainsKey(obj)) continue;
-                
-                _highlightedObjects.Add(obj, renderer.materials);
-
-                int materialLength = renderer.materials?.Length ?? 0;
-                Material[] newMaterials = new Material[materialLength];
-                
-                for (int i = 0; i < materialLength; i++)
-                {
-                    newMaterials[i] = Instantiate(wireframeMaterial);
-                }
-                
-                renderer.materials = newMaterials;
-            }
-        }
-
-        private void UnhighlightObjects()
-        {
-            foreach (KeyValuePair<GrabbableObject, Material[]> objectEntry in _highlightedObjects)
-            {
-                if (objectEntry.Key == null || objectEntry.Key.mainObjectRenderer == null ||
-                    objectEntry.Key.mainObjectRenderer.materials == null)
-                    continue;
-                objectEntry.Key.mainObjectRenderer.materials = objectEntry.Value;
-            }
-            
-            _highlightedObjects.Clear();
+            excludedScrap.UnionWith(current[^1].Included);
+            yield return null;
         }
     }
 
