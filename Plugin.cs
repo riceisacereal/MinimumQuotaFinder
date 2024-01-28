@@ -19,7 +19,7 @@ namespace MinimumQuotaFinder
         
         private int previousQuota = -1;
         private int previousResult = -1;
-        private List<GrabbableObject> previousInclude;
+        private HashSet<GrabbableObject> previousInclude;
         private HashSet<GrabbableObject> previousExclude;
         public Material wireframeMaterial;
         private Dictionary<GrabbableObject, Material[]> _highlightedObjects = new();
@@ -122,9 +122,9 @@ namespace MinimumQuotaFinder
             if (_highlightLock) yield break;
             
             _highlightLock = true;
-            
-            List<GrabbableObject> toHighlight = new List<GrabbableObject>();
-            yield return GameNetworkManager.Instance.StartCoroutine(GetListToHighlight(allScrap, toHighlight));
+            HUDManager.Instance.DisplayTip("MinimumQuotaFinder", "Calculating...");
+            HashSet<GrabbableObject> toHighlight = new HashSet<GrabbableObject>();
+            yield return GameNetworkManager.Instance.StartCoroutine(GetSetToHighlight(allScrap, toHighlight));
             
             if (toHighlight.Count > 0)
             {
@@ -138,7 +138,7 @@ namespace MinimumQuotaFinder
             _highlightLock = false;
         }
         
-        private void HighlightObjects(List<GrabbableObject> objectsToHighlight)
+        private void HighlightObjects(HashSet<GrabbableObject> objectsToHighlight)
         {
             foreach (GrabbableObject obj in objectsToHighlight)
             {
@@ -174,7 +174,7 @@ namespace MinimumQuotaFinder
             _highlightedObjects.Clear();
         }
 
-        private IEnumerator GetListToHighlight(List<GrabbableObject> allScrap, List<GrabbableObject> toHighlight)
+        private IEnumerator GetSetToHighlight(List<GrabbableObject> allScrap, HashSet<GrabbableObject> toHighlight)
         {
             // Retrieve value of currently sold scrap and quota
             int sold = TimeOfDay.Instance.quotaFulfilled;
@@ -189,12 +189,12 @@ namespace MinimumQuotaFinder
             }
             
             // Return old scan if quota is still the same
-            if (quota == previousQuota && !SoldExcluded(allScrap) && !ThrewAwayIncluded(allScrap, sold) && SubsetOfPrevious(allScrap))
+            if (quota == previousQuota && !SoldExcluded(allScrap) && !ThrewAwayIncluded(allScrap, sold) &&
+                (SubsetOfPrevious(allScrap) || quota == previousResult))
             {
                 // If no wrong scrap was sold, filter out sold from previous combination and return
                 // Else recalculate
-                Logger.LogInfo("Found previous calculation");
-                toHighlight.AddRange(previousInclude.Where(allScrap.Contains).ToList());
+                toHighlight.UnionWith(previousInclude.Where(allScrap.Contains));
                 DisplayCalculationResult(toHighlight, sold, quota);
                 yield break;
             }
@@ -206,7 +206,7 @@ namespace MinimumQuotaFinder
             if (sold + sumScrapValue < quota)
             {
                 HUDManager.Instance.DisplayTip("MinimumQuotaFinder",
-                    $"Not enough scrap to reach quota ({sumScrapValue} < {quota - sold}). Sell everything.");
+                    $"Not enough scrap to reach quota ({sumScrapValue + sold} < {quota}). Sell everything.");
                 yield break;
             }
             
@@ -215,7 +215,7 @@ namespace MinimumQuotaFinder
             yield return GameNetworkManager.Instance.StartCoroutine(DoDynamicProgrammingCoroutine(allScrap, sold, quota, excludedScrap));
             Logger.LogInfo("Count of excluded: " + excludedScrap.Count);
             previousExclude = excludedScrap;
-            toHighlight.AddRange(allScrap.Where(scrap => !excludedScrap.Contains(scrap)).ToList());
+            toHighlight.UnionWith(allScrap.Where(scrap => !excludedScrap.Contains(scrap)));
             previousInclude = toHighlight;
             
             DisplayCalculationResult(toHighlight, sold, quota);
@@ -225,18 +225,15 @@ namespace MinimumQuotaFinder
         private bool SoldExcluded(List<GrabbableObject> allScrap)
         {
             if (previousExclude == null) return false;
-            
-            HashSet<GrabbableObject> allScrapSet = new HashSet<GrabbableObject>(allScrap);
-            return previousExclude.Any(scrap => !allScrapSet.Contains(scrap));
+            return previousExclude.Any(scrap => !allScrap.ToHashSet().Contains(scrap));
         }
 
         private bool ThrewAwayIncluded(List<GrabbableObject> allScrap, int sold)
         {
             if (previousInclude == null) return false;
             // Get list of scrap that still exists
-            HashSet<GrabbableObject> allScrapSet = new HashSet<GrabbableObject>(allScrap);
             // If they don't add up to the previousResult anymore -> one scrap got lost
-            int sum = previousInclude.Intersect(allScrapSet).Sum(scrap => scrap.scrapValue);
+            int sum = previousInclude.Intersect(allScrap.ToHashSet()).Sum(scrap => scrap.scrapValue);
 
             return sum + sold != previousResult;
         }
