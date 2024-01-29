@@ -5,7 +5,6 @@ using System.Linq;
 using System.IO;
 using BepInEx;
 using LethalCompanyInputUtils.Api;
-using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -27,7 +26,7 @@ namespace MinimumQuotaFinder
         private bool _toggled = false;
         private bool _highlightLock = false;
 
-        private int id = 65;
+        // private int id = 65;
         
         private void Awake()
         {
@@ -163,7 +162,7 @@ namespace MinimumQuotaFinder
                 // It is possible for objects to not have their MeshRenderers set in the object. This finds and sets it
                 if (obj.mainObjectRenderer == null)
                 {
-                    obj.mainObjectRenderer = obj.GetComponent<MeshRenderer>();
+                    obj.mainObjectRenderer = obj.GetComponentInChildren<MeshRenderer>();
                 }
                 
                 Renderer renderer = obj.mainObjectRenderer;
