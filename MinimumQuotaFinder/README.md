@@ -1,7 +1,8 @@
 # MinimumQuotaFinder
-Co-created by [@Luesewr](https://github.com/Luesewr) and [@riceisacereal](https://github.com/riceisacereal)
+Co-created by [@Luesewr](https://github.com/Luesewr) and [@riceisacereal](https://github.com/riceisacereal)\
+[Thunderstore](https://thunderstore.io/c/lethal-company/p/PotatoCoders/MinimumQuotaFinder/) | [Github](https://github.com/riceisacereal/MinimumQuotaFinder)
 
-This mod calculates and highlights the minimum total value of scraps that you can sell to still reach the quota. The default key to trigger the mod is `H`, but this can be changed in the settings.
+This mod calculates and highlights the minimum total value of scraps that you can sell to still reach the quota. **The default key to trigger the mod is `H`**, but this can be changed in the settings.
 
 The same in essence as: [ScrapCalculator](https://thunderstore.io/c/lethal-company/p/granny/ScrapCalculator/)\
 Scrap auto-selling mods: [SellMyScrap](https://thunderstore.io/c/lethal-company/p/Zehs/SellMyScrap/), [SellFromTerminal](https://thunderstore.io/c/lethal-company/p/stormytuna/SellFromTerminal/)
@@ -10,7 +11,9 @@ Scrap auto-selling mods: [SellMyScrap](https://thunderstore.io/c/lethal-company/
 - Always finds the most optimal answer quickly (5ms to 1s depending on quota and number of items) using an [optimized algorithm](#explanation-of-algorithm).
 - Cool highlighting shader
 
-## Quirks of the way the mod works
+## How the mod works
+- **Press H to trigger the mod**
+  - The keybind can be changed in the settings.
 - When you're on the company moon, all scrap in the environment is taken into account (including scrap on the counter), unless **its y-value is under -30** (somehow dropped over the railings). Otherwise only scrap within the ship is considered.
   - Pros: You can take items outside the ship on the company moon and they will still be included in the calculation.
 - Calculation assumes that you are selling when the company is buying at 100% (it's too complicated otherwise due to rounding per batch requiring you to sell in a specific order of batches, and we don't want to go down that road).
@@ -32,10 +35,10 @@ The algorithm we've implemented is very similar to the solution to the [0-1 knap
 The 2 factors that determine how long it takes to calculate an answer are the value of the quota, the number of scrap, and the total value of that scrap. The algorithm goes through a table the size of (total value of scrap owned - quota) * number of scrap, so the bigger the difference between your quota and the total value of all your scrap, and the more scrap you have, the longer it takes to calculate.
 
 ### Performance Impact
-To prevent the game from freezing while doing large calculations, the mod makes use of [coroutines](https://docs.unity3d.com/Manual/Coroutines.html). These coroutines spread out the calculations over multiple frames and limit the number of computations ran per frame.
+To prevent the game from freezing while doing large calculations, the mod makes use of [coroutines](https://docs.unity3d.com/Manual/Coroutines.html). These coroutines spread out the calculations over multiple frames and limit the number of computations ran per frame for a smoother user experience. 
 
 ## Credits
 This mod was built using the [BepInEx mod template](https://docs.bepinex.dev/articles/dev_guide/plugin_tutorial/2_plugin_start.html). Part of [ShipLoot mod](https://github.com/tinyhoot/ShipLoot)'s code was taken as a starting point. [InputUtils](https://thunderstore.io/c/lethal-company/p/Rune580/LethalCompany_InputUtils/) was used to make the keybinding. This [Wireframe Shader](https://gist.github.com/baba-s/14ecab2df06188a083e66ab00b2c9499) was used as a basis for the custom wireframe shader.
 
 ## Installation
-[Thunderstore link]()
+[Thunderstore link](https://thunderstore.io/c/lethal-company/p/PotatoCoders/MinimumQuotaFinder/)
