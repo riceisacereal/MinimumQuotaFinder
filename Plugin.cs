@@ -10,7 +10,7 @@ using UnityEngine.InputSystem;
 
 namespace MinimumQuotaFinder
 {
-    [BepInPlugin("com.github.riceisacereal.MinimumQuotaFinder", "MinimumQuotaFinder", "0.1.0")]
+    [BepInPlugin("com.github.riceisacereal.MinimumQuotaFinder", "MinimumQuotaFinder", "1.0.1")]
     [BepInDependency("com.rune580.LethalCompanyInputUtils")]
     public class MinimumQuotaFinder : BaseUnityPlugin
     {

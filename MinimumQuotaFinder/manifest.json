@@ -1,6 +1,6 @@
 ﻿{
   "name": "MinimumQuotaFinder",
-  "version_number": "1.0.0",
+  "version_number": "1.0.1",
   "website_url": "https://github.com/riceisacereal/MinimumQuotaFinder",
   "description": "Calculates and highlights the minimum total value of scraps that you can sell to still reach the quota.",
   "dependencies": [
