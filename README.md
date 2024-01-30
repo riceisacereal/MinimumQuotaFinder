@@ -2,7 +2,7 @@
 Co-created by [@Luesewr](https://github.com/Luesewr) and [@riceisacereal](https://github.com/riceisacereal)\
 [Thunderstore](https://thunderstore.io/c/lethal-company/p/PotatoCoders/MinimumQuotaFinder/) | [Github](https://github.com/riceisacereal/MinimumQuotaFinder)
 
-This mod calculates and highlights the minimum total value of scraps that you can sell to still reach the quota. **The default key to trigger the mod is `H`**, but this can be changed in the settings.
+This mod calculates and highlights the minimum total value of scraps that you can sell to still reach the quota. **The default key to toggle the highlighting is `H`**, but this can be changed in the settings.
 
 The same in essence as: [ScrapCalculator](https://thunderstore.io/c/lethal-company/p/granny/ScrapCalculator/)\
 Scrap auto-selling mods: [SellMyScrap](https://thunderstore.io/c/lethal-company/p/Zehs/SellMyScrap/), [SellFromTerminal](https://thunderstore.io/c/lethal-company/p/stormytuna/SellFromTerminal/)
@@ -12,7 +12,7 @@ Scrap auto-selling mods: [SellMyScrap](https://thunderstore.io/c/lethal-company/
 - Cool highlighting shader
 
 ## How the mod works
-- **Press H to trigger the mod**
+- **Press H to toggle the highlighting/recalculate**
   - The keybind can be changed in the settings.
 - When you're on the company moon, all scrap in the environment is taken into account (including scrap on the counter), unless **its y-value is under -30** (somehow dropped over the railings). Otherwise only scrap within the ship is considered.
   - Pros: You can take items outside the ship on the company moon and they will still be included in the calculation.
