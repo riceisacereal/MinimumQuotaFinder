@@ -1,7 +1,7 @@
 # MinimumQuotaFinder
 Co-created by [@Luesewr](https://github.com/Luesewr) and [@riceisacereal](https://github.com/riceisacereal)
 
-This mod calculates and highlights the minimum total value of scraps that you can sell to still reach the quota.
+This mod calculates and highlights the minimum total value of scraps that you can sell to still reach the quota. The default key to trigger the mod is `H`, but this can be changed in the settings.
 
 The same in essence as: [ScrapCalculator](https://thunderstore.io/c/lethal-company/p/granny/ScrapCalculator/)\
 Scrap auto-selling mods: [SellMyScrap](https://thunderstore.io/c/lethal-company/p/Zehs/SellMyScrap/), [SellFromTerminal](https://thunderstore.io/c/lethal-company/p/stormytuna/SellFromTerminal/)
