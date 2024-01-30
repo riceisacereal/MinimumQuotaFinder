@@ -63,7 +63,7 @@ namespace MinimumQuotaFinder
         public void CreateShader()
         {
             // Load the shader from an AssetBundle file
-            string bundlePath = Path.Join(Path.GetDirectoryName(Info.Location), "AssetBundles/wireframe");
+            string bundlePath = Path.Join(Path.GetDirectoryName(Info.Location), "wireframe");
             AssetBundle shaderBundle = AssetBundle.LoadFromFile(bundlePath);
             Shader shader = shaderBundle.LoadAsset<Shader>("assets/wireframeshader.shader");
             
