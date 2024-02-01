@@ -30,6 +30,28 @@ namespace MinimumQuotaFinder
                 __instance.controlTipLines[i].text = "Highlight Minimum Quota : [H]";
             }
         }
+        
+        [HarmonyPostfix]
+        [HarmonyPatch(typeof(HUDManager), nameof(HUDManager.PingScan_performed))]
+        public static void OnPing(HUDManager __instance, InputAction.CallbackContext context)
+        {
+            string message = "Highlight Minimum Quota : [H]";
+            
+            int i = 0;
+            while (i < __instance.controlTipLines.Length && __instance.controlTipLines[i].text != "")
+            {
+                if (__instance.controlTipLines[i].text == message)
+                {
+                    return;
+                }
+                i++;
+            }
+
+            if (i < __instance.controlTipLines.Length)
+            {
+                __instance.controlTipLines[i].text = message;
+            }
+        }
     }
     
     [BepInPlugin(GUID, NAME, VERSION)]
