@@ -19,6 +19,9 @@ namespace MinimumQuotaFinder
         [HarmonyPatch(typeof(HUDManager), nameof(HUDManager.Awake))]
         public static void OnAwake(HUDManager __instance)
         {
+            // Patch to add a highlight instruction to the tips on the HUD after the creation of a HUDManger
+            
+            // Find the first available tip row and put the message in there
             int i = 0;
             while (i < __instance.controlTipLines.Length && __instance.controlTipLines[i].text != "")
             {
@@ -35,6 +38,10 @@ namespace MinimumQuotaFinder
         [HarmonyPatch(typeof(HUDManager), nameof(HUDManager.PingScan_performed))]
         public static void OnPing(HUDManager __instance, InputAction.CallbackContext context)
         {
+            // Don't show message if you're not in the ship on a moon
+            if (StartOfRound.Instance.currentLevelID != 3 && !GameNetworkManager.Instance.localPlayerController.isInHangarShipRoom) return;
+            
+            // Patch to add a highlight instruction to the tips on the HUD after performing a scan
             string message = "Highlight Minimum Quota : [H]";
             
             int i = 0;
@@ -137,6 +144,8 @@ namespace MinimumQuotaFinder
             // Highlight if toggled, unhighlight otherwise
             if (_toggled)
             {
+                // Cancel the highlighting if the player is outside of their ship on a moon
+                if (StartOfRound.Instance.currentLevelID != 3 && !GameNetworkManager.Instance.localPlayerController.isInHangarShipRoom) return;
                 // Start the coroutine for highlighting, this will give back control after the first round of calculations
                 GameNetworkManager.Instance.StartCoroutine(HighlightObjectsCoroutine());
             }
