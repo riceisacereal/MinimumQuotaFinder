@@ -3,17 +3,43 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
+using System.Reflection;
 using BepInEx;
+using HarmonyLib;
 using LethalCompanyInputUtils.Api;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace MinimumQuotaFinder
 {
-    [BepInPlugin("com.github.riceisacereal.MinimumQuotaFinder", "MinimumQuotaFinder", "1.0.1")]
+    [HarmonyPatch]
+    internal class HUDPatch
+    {
+        [HarmonyPostfix]
+        [HarmonyPatch(typeof(HUDManager), nameof(HUDManager.Awake))]
+        public static void OnAwake(HUDManager __instance)
+        {
+            int i = 0;
+            while (i < __instance.controlTipLines.Length && __instance.controlTipLines[i].text != "")
+            {
+                i++;
+            }
+
+            if (i < __instance.controlTipLines.Length)
+            {
+                __instance.controlTipLines[i].text = "Highlight Minimum Quota : [H]";
+            }
+        }
+    }
+    
+    [BepInPlugin(GUID, NAME, VERSION)]
     [BepInDependency("com.rune580.LethalCompanyInputUtils")]
     public class MinimumQuotaFinder : BaseUnityPlugin
     {
+        private const string GUID = "com.github.riceisacereal.MinimumQuotaFinder";
+        private const string NAME = "MinimumQuotaFinder";
+        private const string VERSION = "1.0.1";
+        
         internal static HighlightInputClass InputActionsInstance = new();
         private const int THRESHOLD = 300000;
         
@@ -32,6 +58,8 @@ namespace MinimumQuotaFinder
         {
             SetupKeybindCallbacks();
             CreateShader();
+            Harmony harmony = new Harmony(GUID);
+            harmony.PatchAll(Assembly.GetExecutingAssembly());
             
             Logger.LogInfo("MinimumQuotaFinder successfully loaded!");
         }
