@@ -77,7 +77,7 @@ namespace MinimumQuotaFinder
         private HashSet<GrabbableObject> previousInclude;
         private HashSet<GrabbableObject> previousExclude;
         public Material wireframeMaterial;
-        private Dictionary<GrabbableObject, Material[]> _highlightedObjects = new();
+        private Dictionary<MeshRenderer, Material[]> _highlightedObjects = new();
         private bool _toggled = false;
         private bool _highlightLock = false;
 
@@ -218,49 +218,33 @@ namespace MinimumQuotaFinder
         {
             foreach (GrabbableObject obj in objectsToHighlight)
             {
-                // It is possible for objects to not have their MeshRenderers set in the object. This finds and sets it
-                if (obj.mainObjectRenderer == null)
-                {
-                    obj.mainObjectRenderer = obj.GetComponentInChildren<MeshRenderer>();
-                }
-                
-                Renderer renderer = obj.mainObjectRenderer;
+                MeshRenderer[] renderers = obj.GetComponentsInChildren<MeshRenderer>();
 
-                // If no renderer could be found skip the item, the user probably unloaded the item
-                if (renderer == null)
+                // Overwrite all the materials of all the MeshRenderers associated with the object with the wireframe material
+                foreach (MeshRenderer renderer in renderers)
                 {
-                    continue;
+                    _highlightedObjects.Add(renderer, renderer.materials);
+                    
+                    int materialLength = renderer.materials?.Length ?? 0;
+                
+                    Material[] newMaterials = new Material[materialLength];
+                    Array.Fill(newMaterials, wireframeMaterial);
+                
+                    renderer.materials = newMaterials;
                 }
-                
-                // Don't highlight if the object is already highlighted
-                if (_highlightedObjects.ContainsKey(obj))
-                {
-                    continue;
-                }
-                
-                // Add the object to the highlighting dictionary to later return its materials
-                _highlightedObjects.Add(obj, renderer.materials);
-                
-                // Overwrite all the materials of the object with the wireframe material
-                int materialLength = renderer.materials?.Length ?? 0;
-                
-                Material[] newMaterials = new Material[materialLength];
-                Array.Fill(newMaterials, wireframeMaterial);
-                
-                renderer.materials = newMaterials;
             }
         }
         
         private void UnhighlightObjects()
         {
             // Put back the original materials of all the highlighted objects
-            foreach (KeyValuePair<GrabbableObject, Material[]> objectEntry in _highlightedObjects)
+            foreach (KeyValuePair<MeshRenderer, Material[]> objectEntry in _highlightedObjects)
             {
                 // Skip the entry if the object can't be found anymore because it unloaded
-                if (objectEntry.Key == null || objectEntry.Key.mainObjectRenderer == null ||
-                    objectEntry.Key.mainObjectRenderer.materials == null)
+                if (objectEntry.Key.materials == null)
                     continue;
-                objectEntry.Key.mainObjectRenderer.materials = objectEntry.Value;
+                
+                objectEntry.Key.materials = objectEntry.Value;
             }
             
             // Clear the dictionary keeping track of the highlighted objects
