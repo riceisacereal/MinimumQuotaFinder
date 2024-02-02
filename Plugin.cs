@@ -175,14 +175,25 @@ namespace MinimumQuotaFinder
             List<GrabbableObject> allScrap = scope.GetComponentsInChildren<GrabbableObject>()
                 .Where(obj => obj.itemProperties.isScrap && obj.transform.position.y > minimumHeight).ToList();
             
+            return allScrap;
+        }
+
+        private List<GrabbableObject> GetDeskScrap()
+        {
+            List<GrabbableObject> allScrap = new List<GrabbableObject>();
             DepositItemsDesk desk = FindObjectOfType<DepositItemsDesk>();
             if (desk != null)
             {
                 allScrap.AddRange(desk.deskObjectsContainer.GetComponentsInChildren<GrabbableObject>()
-                    .Where(obj => obj.itemProperties.isScrap && obj.transform.position.y > minimumHeight).ToList());
+                    .Where(obj => obj.itemProperties.isScrap));
             }
-            
+
             return allScrap;
+        }
+
+        private int GetDeskScrapValue()
+        {
+            return GetDeskScrap().Sum(obj => obj.scrapValue);
         }
 
         private IEnumerator HighlightObjectsCoroutine()
@@ -204,6 +215,7 @@ namespace MinimumQuotaFinder
             if (toHighlight.Count > 0)
             {
                 HighlightObjects(toHighlight);
+                HighlightObjects(GetDeskScrap());
             }
             else
             {
@@ -214,7 +226,7 @@ namespace MinimumQuotaFinder
             _highlightLock = false;
         }
         
-        private void HighlightObjects(HashSet<GrabbableObject> objectsToHighlight)
+        private void HighlightObjects(IEnumerable<GrabbableObject> objectsToHighlight)
         {
             foreach (GrabbableObject obj in objectsToHighlight)
             {
@@ -254,7 +266,7 @@ namespace MinimumQuotaFinder
         private IEnumerator GetSetToHighlight(List<GrabbableObject> allScrap, HashSet<GrabbableObject> toHighlight)
         {
             // Retrieve value of currently sold scrap and quota
-            int sold = TimeOfDay.Instance.quotaFulfilled;
+            int sold = TimeOfDay.Instance.quotaFulfilled + GetDeskScrapValue();
             int quota = TimeOfDay.Instance.profitQuota;
             
             // Retrieve all scrap in ship
