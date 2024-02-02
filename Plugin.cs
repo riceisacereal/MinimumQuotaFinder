@@ -351,10 +351,10 @@ namespace MinimumQuotaFinder
             }
             
             int calculations = 0;
-            
+            int minScrapValue = Math.Max(allScrap.Min(scrap => scrap.scrapValue), 0);
             for (int y = 1; y <= numItems; y++)
             {
-                for (int x = 0; x <= inverseTarget; x++)
+                for (int x = minScrapValue; x <= inverseTarget; x++)
                 {
                     int currentScrapValue = allScrap[y - 1].scrapValue;
                     // Copy the previous data if the current amount is lower than the value of the scrap
