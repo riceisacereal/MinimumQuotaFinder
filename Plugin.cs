@@ -384,6 +384,12 @@ namespace MinimumQuotaFinder
                 prev = current;
                 current = new MemCell[inverseTarget + 1];
                 
+                // Check if the current best is already equal to inverseTarget, if yes return set
+                if (prev[^1].Max == inverseTarget)
+                {
+                    excludedScrap.UnionWith(prev[^1].Included);
+                }
+                
                 // Add the amount of calculations to calculations, yield if the number of calculations surpass the threshold
                 calculations += inverseTarget;
                 if (calculations > THRESHOLD)
@@ -393,7 +399,7 @@ namespace MinimumQuotaFinder
                 }
             }
             
-            // Update the excluded scrap by return the included of the highest quota and yield one last time to indicate that the coroutine finished
+            // Update the excluded scrap by returning the included of the highest quota and yield one last time to indicate that the coroutine finished
             excludedScrap.UnionWith(prev[^1].Included);
             yield return null;
         }
