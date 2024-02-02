@@ -251,7 +251,7 @@ namespace MinimumQuotaFinder
             _highlightedObjects.Clear();
         }
 
-        private IEnumerator GetSetToHighlight(List<GrabbableObject> allScrap, HashSet<GrabbableObject> toHighlight)
+        private IEnumerator GetSetToHighlight(List<GrabbableObject> allScrap, HashSet<GrabbableObject> includedScrap)
         {
             // Retrieve value of currently sold scrap and quota
             int sold = TimeOfDay.Instance.quotaFulfilled;
@@ -270,8 +270,8 @@ namespace MinimumQuotaFinder
                 (SubsetOfPrevious(allScrap) || quota == previousResult))
             {
                 // If no recalculation is needed highlight the objects from the previous result
-                toHighlight.UnionWith(previousInclude.Where(allScrap.Contains));
-                DisplayCalculationResult(toHighlight, sold, quota);
+                includedScrap.UnionWith(previousInclude.Where(allScrap.Contains));
+                DisplayCalculationResult(includedScrap, sold, quota);
                 yield break;
             }
             
@@ -290,17 +290,24 @@ namespace MinimumQuotaFinder
             // Sort the items on their id in hopes of getting more consistent results
             allScrap.Sort((x, y) => x.NetworkObjectId.CompareTo(y.NetworkObjectId));
             
-            // Start a coroutine to calculate which objects to include or exclude
+            // Get the direct target and inverse target
+            int inverseTarget = allScrap.Sum(scrap => scrap.scrapValue) - (quota - sold);
+            // TODO: Get the direct target by doing a quick Greedy approximation
+            int directTarget = quota - sold;
+            // Determine which calculation is faster
+            bool useInverseTarget = inverseTarget <= quota;
+            int target = useInverseTarget ? inverseTarget : directTarget;
             HashSet<GrabbableObject> excludedScrap = new HashSet<GrabbableObject>();
-            yield return GameNetworkManager.Instance.StartCoroutine(DoDynamicProgrammingCoroutine(allScrap, sold, quota, excludedScrap));
-            toHighlight.UnionWith(allScrap.Where(scrap => !excludedScrap.Contains(scrap)));
+            // Start a coroutine to calculate which objects to include or exclude
+            yield return GameNetworkManager.Instance.StartCoroutine(
+                GetIncludedCoroutine(allScrap, useInverseTarget, target, includedScrap, excludedScrap));
             
             // Update the previous include and exclude variables
             previousExclude = excludedScrap;
-            previousInclude = toHighlight;
+            previousInclude = includedScrap;
             
             // Display the results from the calculations
-            DisplayCalculationResult(toHighlight, sold, quota);
+            DisplayCalculationResult(includedScrap, sold, quota);
             
             // Indicate that this coroutine finished my yielding one last time
             yield return null;
@@ -336,15 +343,15 @@ namespace MinimumQuotaFinder
                 $"Optimal scrap combination found: {result} ({sold} already sold). " +
                 $"<color={colour}>{difference}</color> over quota. ");
         }
-
-        private IEnumerator DoDynamicProgrammingCoroutine(List<GrabbableObject> allScrap, int sold, int quota, HashSet<GrabbableObject> excludedScrap)
+        
+        private IEnumerator GetIncludedCoroutine(List<GrabbableObject> allScrap, bool inverseTarget, int target,
+            HashSet<GrabbableObject> includedScrap, HashSet<GrabbableObject> excludedScrap)
         {
             // Subset sum/knapsack on total value of all scraps - quota + already paid quota
             int numItems = allScrap.Count;
-            int inverseTarget = allScrap.Sum(scrap => scrap.scrapValue) - (quota - sold);
-
-            MemCell[] prev = new MemCell[inverseTarget + 1];
-            MemCell[] current = new MemCell[inverseTarget + 1];
+  
+            MemCell[] prev = new MemCell[target + 1];
+            MemCell[] current = new MemCell[target + 1];
             for (int i = 0; i < prev.Length; i++)
             {
                 prev[i] = new MemCell(0, new HashSet<GrabbableObject>());
@@ -354,7 +361,7 @@ namespace MinimumQuotaFinder
             int minScrapValue = Math.Max(allScrap.Min(scrap => scrap.scrapValue), 0);
             for (int y = 1; y <= numItems; y++)
             {
-                for (int x = minScrapValue; x <= inverseTarget; x++)
+                for (int x = minScrapValue; x <= target; x++)
                 {
                     int currentScrapValue = allScrap[y - 1].scrapValue;
                     // Copy the previous data if the current amount is lower than the value of the scrap
@@ -380,18 +387,32 @@ namespace MinimumQuotaFinder
                         current[x] = prev[x];
                     }
                 }
-                // Update the previous and clear the current
-                prev = current;
-                current = new MemCell[inverseTarget + 1];
                 
-                // Check if the current best is already equal to inverseTarget, if yes return set
-                if (prev[^1].Max == inverseTarget)
+                // Check if the current best at target index is already equal to the target (most optimal)
+                if (current[target].Max == target)
                 {
-                    excludedScrap.UnionWith(prev[^1].Included);
+                    if (inverseTarget)
+                    {
+                        // If we are calculating the inverse target, prev[target].Included contains what to exclude
+                        // So add scrap that is not in prev[target].Included to the final result
+                        includedScrap.UnionWith(allScrap.Where(scrap => !prev[target].Included.Contains(scrap)));
+                    }
+                    else
+                    {
+                        // If we are calculating the direct target, prev[target].Included contains what to include
+                        includedScrap.UnionWith(prev[target].Included);
+                    }
+                    
+                    // Break coroutine
+                    yield break;
                 }
                 
+                // Update the previous and clear the current
+                prev = current;
+                current = new MemCell[target + 1];
+                
                 // Add the amount of calculations to calculations, yield if the number of calculations surpass the threshold
-                calculations += inverseTarget;
+                calculations += target;
                 if (calculations > THRESHOLD)
                 {
                     yield return null;
@@ -399,8 +420,29 @@ namespace MinimumQuotaFinder
                 }
             }
             
-            // Update the excluded scrap by returning the included of the highest quota and yield one last time to indicate that the coroutine finished
-            excludedScrap.UnionWith(prev[^1].Included);
+            // Calculation went through entire table, meaning a combination == target was not found
+            if (inverseTarget)
+            {
+                // If inverse target was calculated, add the most optimal combination to the excluded set, and
+                // add the opposite to the included set
+                excludedScrap.UnionWith(prev[target].Included);
+                includedScrap.UnionWith(allScrap.Where(scrap => !prev[target].Included.Contains(scrap)));
+            }
+            else
+            {
+                // If direct target was calculated, start from the target index and loop until a Max >= target is found
+                for (int i = target; i < prev.Length; i++)
+                {
+                    if (prev[i].Max >= target)
+                    {
+                        // If a suitable combination was found, add it to the set of included scrap and break the loop
+                        includedScrap.UnionWith(prev[i].Included);
+                        excludedScrap.UnionWith(allScrap.Where(scrap => !prev[i].Included.Contains(scrap)));
+                        break;
+                    }
+                }
+            }
+            
             yield return null;
         }
     }
