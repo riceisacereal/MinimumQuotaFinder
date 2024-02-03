@@ -1,22 +1,26 @@
-# Changelog
+  # Changelog
 
 ## Unreleased
 ### Features
-- Added instruction for highlighting to the HUD when first joining a file and when scanning within the ship or on the company moon
-- Blocked highlighting when not on the ship when not on the company moon (you can still unhighlight)
-- Count scrap on the desk on the company moon as sold as these can't be taken off the desk
+- Added instruction for highlighting to the HUD tooltips (top right corner) when first joining a file and when scanning within the ship or on the company moon
+- Made it so that highlighting can not be triggered when not on the ship and when not on the company moon (you can still unhighlight)
+- Made it so that scrap on the counter at the company moon is counted as sold directly as these can't be taken off the desk
+### Optimizations
+- Added direct target calculation with greedy approximation on top of inverse target calculation
+- Added a way for the algorithm to terminate early if an optimal solution has already been found
 ### Bug fixes
 - Fixed render distance of wireframe material on certain scrap items
 - Fixed wireframe material on moving parts of scrap items
 ### Documentation
-- Add instructions in case of selling wrong scrap
-- Add more explanation and justification for assuming 100% buy rate
+- README
+  - Added instructions in case of selling wrong scrap
+  - Added more explanation and justification for assuming 100% buy rate
 ## v1.0.1 2024-1-30
 ### Structural
-- Change file structure
+- Changed file structure
   - Moved `wireframe` out of AssetBundle folder and into root because Thunderstore somehow got rid of the folder and placed it in root
 ### Documentation
-- Emphasize the keybind in README
-- Change description and version number in `.csproj`
+- Emphasized the keybind in README
+- Changed description and version number in `.csproj`
 ## v1.0.0 2024-1-29
 - Initial version
