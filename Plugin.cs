@@ -75,7 +75,7 @@ namespace MinimumQuotaFinder
         private int previousQuota = -1;
         private int previousResult = -1;
         private HashSet<GrabbableObject> previousInclude;
-        private HashSet<GrabbableObject> previousExclude;
+        private HashSet<GrabbableObject> previousAllScraps;
         public Material wireframeMaterial;
         private Dictionary<MeshRenderer, Material[]> _highlightedObjects = new();
         private bool _toggled = false;
@@ -289,9 +289,9 @@ namespace MinimumQuotaFinder
             
             // Sort the items on their id in hopes of getting more consistent results
             allScrap.Sort((x, y) => x.NetworkObjectId.CompareTo(y.NetworkObjectId));
-            
-            HashSet<GrabbableObject> excludedScrap = new HashSet<GrabbableObject>();
-            
+            // Update the previous all scraps variable
+            previousAllScraps = allScrap.ToHashSet();
+
             // Get the direct target and inverse target
             int inverseTarget = allScrap.Sum(scrap => scrap.scrapValue) - (quota - sold);
             // Get the direct target by doing a quick Greedy approximation
@@ -301,7 +301,6 @@ namespace MinimumQuotaFinder
             if (directTarget == quota - sold)
             {
                 includedScrap.UnionWith(greedyApproximation);
-                excludedScrap.UnionWith(allScrap.Where(scrap => !greedyApproximation.Contains(scrap)));
                 yield break;
             }
             
@@ -311,10 +310,9 @@ namespace MinimumQuotaFinder
             
             // Start a coroutine to calculate which objects to include or exclude
             yield return GameNetworkManager.Instance.StartCoroutine(
-                GetIncludedCoroutine(allScrap, useInverseTarget, target, includedScrap, excludedScrap));
+                GetIncludedCoroutine(allScrap, useInverseTarget, target, includedScrap));
             
-            // Update the previous include and exclude variables
-            previousExclude = excludedScrap;
+            // Update the previous include variable
             previousInclude = includedScrap;
             
             // Display the results from the calculations
@@ -336,9 +334,9 @@ namespace MinimumQuotaFinder
 
         private bool SubsetOfPrevious(List<GrabbableObject> allScrap)
         {
-            if (allScrap == null || previousInclude == null || previousExclude == null) return false;
+            if (allScrap == null || previousInclude == null || previousAllScraps == null) return false;
             // Check if a new item was entered to the checked environment compared to the previous results
-            return allScrap.ToHashSet().IsSubsetOf(previousExclude.Union(previousInclude));
+            return allScrap.ToHashSet().IsSubsetOf(previousAllScraps);
         }
 
         private List<GrabbableObject> GetGreedyApproximation(List<GrabbableObject> allScrap, int target)
@@ -397,7 +395,7 @@ namespace MinimumQuotaFinder
         }
         
         private IEnumerator GetIncludedCoroutine(List<GrabbableObject> allScrap, bool inverseTarget, int target,
-            HashSet<GrabbableObject> includedScrap, HashSet<GrabbableObject> excludedScrap)
+            HashSet<GrabbableObject> includedScrap)
         {
             // Subset sum/knapsack on total value of all scraps - quota + already paid quota
             int numItems = allScrap.Count;
@@ -451,13 +449,11 @@ namespace MinimumQuotaFinder
                         // If we are calculating the inverse target, prev[target].Included contains what to exclude
                         // So add scrap that is not in prev[target].Included to the final result
                         includedScrap.UnionWith(allScrap.Where(scrap => !prev[target].Included.Contains(scrap)));
-                        excludedScrap.UnionWith(prev[target].Included);
                     }
                     else
                     {
                         // If we are calculating the direct target, prev[target].Included contains what to include
                         includedScrap.UnionWith(prev[target].Included);
-                        excludedScrap.UnionWith(allScrap.Where(scrap => !prev[target].Included.Contains(scrap)));
                     }
                     
                     // Break coroutine
@@ -478,7 +474,6 @@ namespace MinimumQuotaFinder
             {
                 // If inverse target was calculated, add the most optimal combination to the excluded set, and
                 // add the opposite to the included set
-                excludedScrap.UnionWith(prev[target].Included);
                 includedScrap.UnionWith(allScrap.Where(scrap => !prev[target].Included.Contains(scrap)));
             }
             else
@@ -490,7 +485,6 @@ namespace MinimumQuotaFinder
                     {
                         // If a suitable combination was found, add it to the set of included scrap and break the loop
                         includedScrap.UnionWith(prev[i].Included);
-                        excludedScrap.UnionWith(allScrap.Where(scrap => !prev[i].Included.Contains(scrap)));
                         break;
                     }
                 }
