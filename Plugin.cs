@@ -211,9 +211,10 @@ namespace MinimumQuotaFinder
             }
 
             // Get all objects that are scrap
-            // At the counter, only values of scrap items are added to company credit
+            // At the counter, only values of scrap items with a value larger than 0 and are not unreachable (accidentally dropped over the railings)
+            // are added to company credit
             List<GrabbableObject> allScrap = scope.GetComponentsInChildren<GrabbableObject>()
-                .Where(obj => obj.itemProperties.isScrap && obj.transform.position.y > minimumHeight).ToList();
+                .Where(obj => obj.itemProperties.isScrap && obj.scrapValue > 0 && obj.transform.position.y > minimumHeight).ToList();
             
             return allScrap;
         }
