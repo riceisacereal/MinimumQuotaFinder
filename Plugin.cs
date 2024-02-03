@@ -290,14 +290,25 @@ namespace MinimumQuotaFinder
             // Sort the items on their id in hopes of getting more consistent results
             allScrap.Sort((x, y) => x.NetworkObjectId.CompareTo(y.NetworkObjectId));
             
+            HashSet<GrabbableObject> excludedScrap = new HashSet<GrabbableObject>();
+            
             // Get the direct target and inverse target
             int inverseTarget = allScrap.Sum(scrap => scrap.scrapValue) - (quota - sold);
-            // TODO: Get the direct target by doing a quick Greedy approximation
-            int directTarget = quota - sold;
+            // Get the direct target by doing a quick Greedy approximation
+            List<GrabbableObject> greedyApproximation = GetGreedyApproximation(allScrap, quota - sold);
+            int directTarget = greedyApproximation.Sum(scrap => scrap.scrapValue);
+            // If the approximation found is equal to the actual target, include the combination and stop coroutine
+            if (directTarget == quota - sold)
+            {
+                includedScrap.UnionWith(greedyApproximation);
+                excludedScrap.UnionWith(allScrap.Where(scrap => !greedyApproximation.Contains(scrap)));
+                yield break;
+            }
+            
             // Determine which calculation is faster
             bool useInverseTarget = inverseTarget <= quota;
             int target = useInverseTarget ? inverseTarget : directTarget;
-            HashSet<GrabbableObject> excludedScrap = new HashSet<GrabbableObject>();
+            
             // Start a coroutine to calculate which objects to include or exclude
             yield return GameNetworkManager.Instance.StartCoroutine(
                 GetIncludedCoroutine(allScrap, useInverseTarget, target, includedScrap, excludedScrap));
@@ -328,6 +339,47 @@ namespace MinimumQuotaFinder
             if (allScrap == null || previousInclude == null || previousExclude == null) return false;
             // Check if a new item was entered to the checked environment compared to the previous results
             return allScrap.ToHashSet().IsSubsetOf(previousExclude.Union(previousInclude));
+        }
+
+        private List<GrabbableObject> GetGreedyApproximation(List<GrabbableObject> allScrap, int target)
+        {
+            // Construct a list of Greedily chosen scrap to get a good low high-bound for 
+            List<GrabbableObject> greedyOrderedScrap = allScrap.OrderByDescending(scrap => scrap.scrapValue).ToList();
+            List<GrabbableObject> greedyCombination = new List<GrabbableObject>();
+
+            // Greedily add scrap to combination until adding another one would be above target
+            foreach (GrabbableObject scrap in greedyOrderedScrap)
+            {
+                int currentSum = greedyCombination.Sum(s => s.scrapValue);
+                // Add the piece of scrap if it will make the sum of the combination <= target
+                if (currentSum + scrap.scrapValue <= target)
+                {
+                    greedyCombination.Add(scrap);
+                }
+                // Else if the sum exceeds the target, break the loop
+                else
+                {
+                    break;
+                }
+            }
+
+            // Return the combination directly if we were somehow lucky enough to find the right combination right away
+            if (greedyCombination.Sum(s => s.scrapValue) == target) return greedyCombination;
+
+            // Attempt to find the smallest value of scrap we can add to exceed the target the least
+            int sum = greedyCombination.Sum(s => s.scrapValue);
+            for (int i = greedyOrderedScrap.Count - 1; i >= 0; i++)
+            {
+                GrabbableObject currentScrap = greedyOrderedScrap[i];
+                // Find from low to high the first scrap which when added to the combination, makes the sum higher than the target
+                if (sum + currentScrap.scrapValue >= target)
+                {
+                    greedyCombination.Add(currentScrap);
+                    break;
+                }
+            }
+
+            return greedyCombination;
         }
         
         private void DisplayCalculationResult(IEnumerable<GrabbableObject> toHighlight, int sold, int quota)
