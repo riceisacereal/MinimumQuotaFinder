@@ -5,10 +5,12 @@ using System.Linq;
 using System.IO;
 using System.Reflection;
 using BepInEx;
+using GameNetcodeStuff;
 using HarmonyLib;
 using LethalCompanyInputUtils.Api;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 
 namespace MinimumQuotaFinder
 {
@@ -59,6 +61,26 @@ namespace MinimumQuotaFinder
                 __instance.controlTipLines[i].text = message;
             }
         }
+
+        [HarmonyPostfix]
+        [HarmonyPatch(typeof(StartOfRound), nameof(StartOfRound.SceneManager_OnLoad))]
+        public static void OnChangeLevel(StartOfRound __instance, ulong clientId, string sceneName, LoadSceneMode loadSceneMode, AsyncOperation asyncOperation)
+        {
+            if (sceneName == "CompanyBuilding")
+            {
+                MinimumQuotaFinder.Instance.TurnOnHighlight(false);
+            }
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPatch(typeof(DepositItemsDesk), nameof(DepositItemsDesk.PlaceItemOnCounter))]
+        public static void OnItemPlacedOnCounter(DepositItemsDesk __instance, PlayerControllerB playerWhoTriggered)
+        {
+            if (MinimumQuotaFinder.Instance.IsToggled())
+            {
+                MinimumQuotaFinder.Instance.TurnOnHighlight(false);
+            }
+        }
     }
     
     [BepInPlugin(GUID, NAME, VERSION)]
@@ -68,32 +90,42 @@ namespace MinimumQuotaFinder
         private const string GUID = "com.github.riceisacereal.MinimumQuotaFinder";
         private const string NAME = "MinimumQuotaFinder";
         private const string VERSION = "1.0.1";
+
+        public static MinimumQuotaFinder Instance
+        {
+            get;
+            private set;
+        }
         
         internal static HighlightInputClass InputActionsInstance = new();
         private const int THRESHOLD = 300000;
         
+        public Material wireframeMaterial;
+        private bool _toggled = false;
+        private bool _highlightLock = false;
         private int previousQuota = -1;
         private int previousResult = -1;
         private HashSet<GrabbableObject> previousInclude;
         private HashSet<GrabbableObject> previousExclude;
-        public Material wireframeMaterial;
         private Dictionary<MeshRenderer, Material[]> _highlightedObjects = new();
-        private bool _toggled = false;
-        private bool _highlightLock = false;
 
         // private int id = 65;
         
         private void Awake()
         {
+            Instance = this;
+            
             SetupKeybindCallbacks();
             CreateShader();
+            
             Harmony harmony = new Harmony(GUID);
             harmony.PatchAll(Assembly.GetExecutingAssembly());
             
             Logger.LogInfo("MinimumQuotaFinder successfully loaded!");
         }
+
         
-        public void SetupKeybindCallbacks()
+        private void SetupKeybindCallbacks()
         {
             InputActionsInstance.HighlightKey.performed += OnHighlightKeyPressed;
             // InputActionsInstance.SpawnScrap.performed += SpawnScrap;
@@ -117,7 +149,7 @@ namespace MinimumQuotaFinder
         //     val.GetComponent<NetworkObject>().Spawn();
         // }
 
-        public void CreateShader()
+        private void CreateShader()
         {
             // Load the shader from an AssetBundle file
             string bundlePath = Path.Join(Path.GetDirectoryName(Info.Location), "wireframe");
@@ -129,7 +161,7 @@ namespace MinimumQuotaFinder
             shaderBundle.Unload(false);
         }
         
-        public void OnHighlightKeyPressed(InputAction.CallbackContext highlightContext)
+        private void OnHighlightKeyPressed(InputAction.CallbackContext highlightContext)
         {
             // Cancel key press if still calculating
             if (_highlightLock) return;
@@ -138,22 +170,30 @@ namespace MinimumQuotaFinder
             
             if (!HUDManager.Instance.CanPlayerScan() || HUDManager.Instance.playerPingingScan > -0.5f) return;
             
-            // Toggle the highlighting
-            _toggled = !_toggled;
-            
             // Highlight if toggled, unhighlight otherwise
-            if (_toggled)
+            if (!_toggled)
             {
-                // Cancel the highlighting if the player is outside of their ship on a moon
-                if (StartOfRound.Instance.currentLevelID != 3 && !GameNetworkManager.Instance.localPlayerController.isInHangarShipRoom) return;
-                // Start the coroutine for highlighting, this will give back control after the first round of calculations
-                GameNetworkManager.Instance.StartCoroutine(HighlightObjectsCoroutine());
+                TurnOnHighlight(true);
             }
             else
             {
-                UnhighlightObjects();
+                TurnOffHighlight();
             }
+        }
 
+        public void TurnOnHighlight(bool displayIfCached)
+        {
+            // Cancel the highlighting if the player is outside of their ship on a moon
+            if (StartOfRound.Instance.currentLevelID != 3 && !GameNetworkManager.Instance.localPlayerController.isInHangarShipRoom) return;
+            // Start the coroutine for highlighting, this will give back control after the first round of calculations
+            GameNetworkManager.Instance.StartCoroutine(HighlightObjectsCoroutine(displayIfCached));
+            _toggled = true;
+        }
+
+        public void TurnOffHighlight()
+        {
+            UnhighlightObjects();
+            _toggled = false;
         }
         
         private List<GrabbableObject> GetAllScrap(int level)
@@ -196,7 +236,7 @@ namespace MinimumQuotaFinder
             return GetDeskScrap().Sum(obj => obj.scrapValue);
         }
 
-        private IEnumerator HighlightObjectsCoroutine()
+        private IEnumerator HighlightObjectsCoroutine(bool displayIfCached)
         {
             // Exit early if it is already calculating
             if (_highlightLock) yield break;
@@ -205,12 +245,15 @@ namespace MinimumQuotaFinder
             _highlightLock = true;
             
             // Show a message to indicate the starting of the calculations in case of big calculation
-            HUDManager.Instance.DisplayTip("MinimumQuotaFinder", "Calculating...");
-            
+            if (displayIfCached)
+            {
+                HUDManager.Instance.DisplayTip("MinimumQuotaFinder", "Calculating...");
+            }
+
             List<GrabbableObject> allScrap = GetAllScrap(StartOfRound.Instance.currentLevelID);
             HashSet<GrabbableObject> toHighlight = new HashSet<GrabbableObject>();
             // Start a coroutine to calculate which items to highlight, this will give back control after all calculations are finished
-            yield return GameNetworkManager.Instance.StartCoroutine(GetSetToHighlight(allScrap, toHighlight));
+            yield return GameNetworkManager.Instance.StartCoroutine(GetSetToHighlight(allScrap, toHighlight, displayIfCached));
             // Highlight the objects or untoggle if nothing should be highlighted
             if (toHighlight.Count > 0)
             {
@@ -235,6 +278,8 @@ namespace MinimumQuotaFinder
                 // Overwrite all the materials of all the MeshRenderers associated with the object with the wireframe material
                 foreach (MeshRenderer renderer in renderers)
                 {
+                    if (_highlightedObjects.ContainsKey(renderer)) continue;
+                    
                     _highlightedObjects.Add(renderer, renderer.materials);
                     
                     int materialLength = renderer.materials?.Length ?? 0;
@@ -253,7 +298,7 @@ namespace MinimumQuotaFinder
             foreach (KeyValuePair<MeshRenderer, Material[]> objectEntry in _highlightedObjects)
             {
                 // Skip the entry if the object can't be found anymore because it unloaded
-                if (objectEntry.Key.materials == null)
+                if (objectEntry.Key == null || objectEntry.Key.materials == null)
                     continue;
                 
                 objectEntry.Key.materials = objectEntry.Value;
@@ -263,7 +308,7 @@ namespace MinimumQuotaFinder
             _highlightedObjects.Clear();
         }
 
-        private IEnumerator GetSetToHighlight(List<GrabbableObject> allScrap, HashSet<GrabbableObject> toHighlight)
+        private IEnumerator GetSetToHighlight(List<GrabbableObject> allScrap, HashSet<GrabbableObject> includedScrap, bool displayIfCached)
         {
             // Retrieve value of currently sold scrap and quota
             int sold = TimeOfDay.Instance.quotaFulfilled + GetDeskScrapValue();
@@ -282,8 +327,12 @@ namespace MinimumQuotaFinder
                 (SubsetOfPrevious(allScrap) || quota == previousResult))
             {
                 // If no recalculation is needed highlight the objects from the previous result
-                toHighlight.UnionWith(previousInclude.Where(allScrap.Contains));
-                DisplayCalculationResult(toHighlight, sold, quota);
+                includedScrap.UnionWith(previousInclude.Where(allScrap.Contains));
+                if (displayIfCached)
+                {
+                    DisplayCalculationResult(includedScrap, sold, quota);
+                }
+
                 yield break;
             }
             
@@ -302,17 +351,24 @@ namespace MinimumQuotaFinder
             // Sort the items on their id in hopes of getting more consistent results
             allScrap.Sort((x, y) => x.NetworkObjectId.CompareTo(y.NetworkObjectId));
             
-            // Start a coroutine to calculate which objects to include or exclude
+            // Get the direct target and inverse target
+            int inverseTarget = allScrap.Sum(scrap => scrap.scrapValue) - (quota - sold);
+            // TODO: Get the direct target by doing a quick Greedy approximation
+            int directTarget = quota - sold;
+            // Determine which calculation is faster
+            bool useInverseTarget = inverseTarget <= quota;
+            int target = useInverseTarget ? inverseTarget : directTarget;
             HashSet<GrabbableObject> excludedScrap = new HashSet<GrabbableObject>();
-            yield return GameNetworkManager.Instance.StartCoroutine(DoDynamicProgrammingCoroutine(allScrap, sold, quota, excludedScrap));
-            toHighlight.UnionWith(allScrap.Where(scrap => !excludedScrap.Contains(scrap)));
+            // Start a coroutine to calculate which objects to include or exclude
+            yield return GameNetworkManager.Instance.StartCoroutine(
+                GetIncludedCoroutine(allScrap, true, inverseTarget, includedScrap, excludedScrap));
             
             // Update the previous include and exclude variables
             previousExclude = excludedScrap;
-            previousInclude = toHighlight;
+            previousInclude = includedScrap;
             
             // Display the results from the calculations
-            DisplayCalculationResult(toHighlight, sold, quota);
+            DisplayCalculationResult(includedScrap, sold, quota);
             
             // Indicate that this coroutine finished my yielding one last time
             yield return null;
@@ -348,25 +404,24 @@ namespace MinimumQuotaFinder
                 $"Optimal scrap combination found: {result} ({sold} already sold). " +
                 $"<color={colour}>{difference}</color> over quota. ");
         }
-
-        private IEnumerator DoDynamicProgrammingCoroutine(List<GrabbableObject> allScrap, int sold, int quota, HashSet<GrabbableObject> excludedScrap)
+        
+        private IEnumerator GetIncludedCoroutine(List<GrabbableObject> allScrap, bool inverseTarget, int target,
+            HashSet<GrabbableObject> includedScrap, HashSet<GrabbableObject> excludedScrap)
         {
             // Subset sum/knapsack on total value of all scraps - quota + already paid quota
             int numItems = allScrap.Count;
-            int inverseTarget = allScrap.Sum(scrap => scrap.scrapValue) - (quota - sold);
-
-            MemCell[] prev = new MemCell[inverseTarget + 1];
-            MemCell[] current = new MemCell[inverseTarget + 1];
+  
+            MemCell[] prev = new MemCell[target + 1];
+            MemCell[] current = new MemCell[target + 1];
             for (int i = 0; i < prev.Length; i++)
             {
                 prev[i] = new MemCell(0, new HashSet<GrabbableObject>());
             }
             
             int calculations = 0;
-            
             for (int y = 1; y <= numItems; y++)
             {
-                for (int x = 0; x <= inverseTarget; x++)
+                for (int x = 0; x <= target; x++)
                 {
                     int currentScrapValue = allScrap[y - 1].scrapValue;
                     // Copy the previous data if the current amount is lower than the value of the scrap
@@ -392,12 +447,34 @@ namespace MinimumQuotaFinder
                         current[x] = prev[x];
                     }
                 }
+                
                 // Update the previous and clear the current
                 prev = current;
-                current = new MemCell[inverseTarget + 1];
+                current = new MemCell[target + 1];
+                
+                // Check if the current best at target index is already equal to the target (most optimal)
+                if (prev[target].Max == target)
+                {
+                    if (inverseTarget)
+                    {
+                        // If we are calculating the inverse target, prev[target].Included contains what to exclude
+                        // So add scrap that is not in prev[target].Included to the final result
+                        includedScrap.UnionWith(allScrap.Where(scrap => !prev[target].Included.Contains(scrap)));
+                        excludedScrap.UnionWith(prev[target].Included);
+                    }
+                    else
+                    {
+                        // If we are calculating the direct target, prev[target].Included contains what to include
+                        includedScrap.UnionWith(prev[target].Included);
+                        excludedScrap.UnionWith(allScrap.Where(scrap => !prev[target].Included.Contains(scrap)));
+                    }
+                    
+                    // Break coroutine
+                    yield break;
+                }
                 
                 // Add the amount of calculations to calculations, yield if the number of calculations surpass the threshold
-                calculations += inverseTarget;
+                calculations += target;
                 if (calculations > THRESHOLD)
                 {
                     yield return null;
@@ -405,9 +482,35 @@ namespace MinimumQuotaFinder
                 }
             }
             
-            // Update the excluded scrap by return the included of the highest quota and yield one last time to indicate that the coroutine finished
-            excludedScrap.UnionWith(prev[^1].Included);
+            // Calculation went through entire table, meaning a combination == target was not found
+            if (inverseTarget)
+            {
+                // If inverse target was calculated, add the most optimal combination to the excluded set, and
+                // add the opposite to the included set
+                excludedScrap.UnionWith(prev[target].Included);
+                includedScrap.UnionWith(allScrap.Where(scrap => !prev[target].Included.Contains(scrap)));
+            }
+            else
+            {
+                // If direct target was calculated, start from the target index and loop until a Max >= target is found
+                for (int i = target; i < prev.Length; i++)
+                {
+                    if (prev[i].Max >= target)
+                    {
+                        // If a suitable combination was found, add it to the set of included scrap and break the loop
+                        includedScrap.UnionWith(prev[i].Included);
+                        excludedScrap.UnionWith(allScrap.Where(scrap => !prev[i].Included.Contains(scrap)));
+                        break;
+                    }
+                }
+            }
+            
             yield return null;
+        }
+
+        public bool IsToggled()
+        {
+            return _toggled;
         }
     }
 
