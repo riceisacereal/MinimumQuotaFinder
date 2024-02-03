@@ -358,10 +358,9 @@ namespace MinimumQuotaFinder
             }
             
             int calculations = 0;
-            int minScrapValue = Math.Max(allScrap.Min(scrap => scrap.scrapValue), 0);
             for (int y = 1; y <= numItems; y++)
             {
-                for (int x = minScrapValue; x <= target; x++)
+                for (int x = 0; x <= target; x++)
                 {
                     int currentScrapValue = allScrap[y - 1].scrapValue;
                     // Copy the previous data if the current amount is lower than the value of the scrap
@@ -388,28 +387,30 @@ namespace MinimumQuotaFinder
                     }
                 }
                 
+                // Update the previous and clear the current
+                prev = current;
+                current = new MemCell[target + 1];
+                
                 // Check if the current best at target index is already equal to the target (most optimal)
-                if (current[target].Max == target)
+                if (prev[target].Max == target)
                 {
                     if (inverseTarget)
                     {
                         // If we are calculating the inverse target, prev[target].Included contains what to exclude
                         // So add scrap that is not in prev[target].Included to the final result
                         includedScrap.UnionWith(allScrap.Where(scrap => !prev[target].Included.Contains(scrap)));
+                        excludedScrap.UnionWith(prev[target].Included);
                     }
                     else
                     {
                         // If we are calculating the direct target, prev[target].Included contains what to include
                         includedScrap.UnionWith(prev[target].Included);
+                        excludedScrap.UnionWith(allScrap.Where(scrap => !prev[target].Included.Contains(scrap)));
                     }
                     
                     // Break coroutine
                     yield break;
                 }
-                
-                // Update the previous and clear the current
-                prev = current;
-                current = new MemCell[target + 1];
                 
                 // Add the amount of calculations to calculations, yield if the number of calculations surpass the threshold
                 calculations += target;
