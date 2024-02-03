@@ -361,7 +361,7 @@ namespace MinimumQuotaFinder
             HashSet<GrabbableObject> excludedScrap = new HashSet<GrabbableObject>();
             // Start a coroutine to calculate which objects to include or exclude
             yield return GameNetworkManager.Instance.StartCoroutine(
-                GetIncludedCoroutine(allScrap, true, inverseTarget, includedScrap, excludedScrap));
+                GetIncludedCoroutine(allScrap, useInverseTarget, target, includedScrap, excludedScrap));
             
             // Update the previous include and exclude variables
             previousExclude = excludedScrap;
