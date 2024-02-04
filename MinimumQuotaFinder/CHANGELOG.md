@@ -1,6 +1,6 @@
   # Changelog
 
-## Unreleased
+## v1.1.0
 ### Features
 - Added instruction for highlighting to the HUD tooltips (top right corner) when first joining a file and when scanning within the ship or on the company moon
 - Made it so that highlighting can not be triggered when outside the ship on non-company moons (you can still unhighlight)
@@ -18,6 +18,8 @@
 - README
   - Added instructions in case of selling wrong scrap
   - Added more explanation and justification for assuming 100% buy rate
+- Add CHANGELOG
+
 ## v1.0.1 2024-1-30
 ### Structural
 - Changed file structure
@@ -25,5 +27,6 @@
 ### Documentation
 - Emphasized the keybind in README
 - Changed description and version number in `.csproj`
+
 ## v1.0.0 2024-1-29
 - Initial version
