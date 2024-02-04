@@ -353,26 +353,35 @@ namespace MinimumQuotaFinder
             // Update the previous all scraps variable
             previousAllScraps = allScrap.ToHashSet();
 
-            // Get the direct target and inverse target
+            // Get the inverseTarget
             int inverseTarget = allScrap.Sum(scrap => scrap.scrapValue) - (quota - sold);
-            // Get the direct target by doing a quick Greedy approximation
-            List<GrabbableObject> greedyApproximation = GetGreedyApproximation(allScrap, quota - sold);
-            int directTarget = greedyApproximation.Sum(scrap => scrap.scrapValue);
-            // If the approximation found is equal to the actual target, include the combination and stop coroutine
-            if (directTarget == quota - sold)
-            {
-                includedScrap.UnionWith(greedyApproximation);
-                yield break;
-            }
             
             // Determine which calculation is faster
             bool useInverseTarget = inverseTarget <= quota;
-            int target = useInverseTarget ? inverseTarget : directTarget;
-            
-            // Start a coroutine to calculate which objects to include or exclude
-            yield return GameNetworkManager.Instance.StartCoroutine(
-                GetIncludedCoroutine(allScrap, useInverseTarget, target, includedScrap));
-            
+            if (useInverseTarget)
+            {
+                // Start a coroutine to calculate which objects to include
+                yield return GameNetworkManager.Instance.StartCoroutine(
+                    GetIncludedCoroutine(allScrap, true, inverseTarget, includedScrap));
+            }
+            else
+            {
+                // Get the direct target by doing a quick Greedy approximation
+                List<GrabbableObject> greedyApproximation = GetGreedyApproximation(allScrap, quota - sold);
+                int directTarget = greedyApproximation.Sum(scrap => scrap.scrapValue);
+                // If the approximation found is equal to the actual target, include the approximation combination directly
+                if (directTarget == quota - sold)
+                {
+                    includedScrap.UnionWith(greedyApproximation);
+                }
+                else
+                {
+                    // Start a coroutine to calculate which objects to include
+                    yield return GameNetworkManager.Instance.StartCoroutine(
+                        GetIncludedCoroutine(allScrap, false, directTarget, includedScrap));
+                }
+            }
+
             // Update the previous include variable
             previousInclude = includedScrap;
             
@@ -407,13 +416,15 @@ namespace MinimumQuotaFinder
             List<GrabbableObject> greedyCombination = new List<GrabbableObject>();
 
             // Greedily add scrap to combination until adding another one would be above target
+            int sum = 0;
             foreach (GrabbableObject scrap in greedyOrderedScrap)
             {
-                int currentSum = greedyCombination.Sum(s => s.scrapValue);
                 // Add the piece of scrap if it will make the sum of the combination <= target
-                if (currentSum + scrap.scrapValue <= target)
+                int currentScrapValue = scrap.scrapValue;
+                if (sum + currentScrapValue <= target)
                 {
                     greedyCombination.Add(scrap);
+                    sum += currentScrapValue;
                 }
                 // Else if the sum exceeds the target, break the loop
                 else
@@ -426,8 +437,7 @@ namespace MinimumQuotaFinder
             if (greedyCombination.Sum(s => s.scrapValue) == target) return greedyCombination;
 
             // Attempt to find the smallest value of scrap we can add to exceed the target the least
-            int sum = greedyCombination.Sum(s => s.scrapValue);
-            for (int i = greedyOrderedScrap.Count - 1; i >= 0; i++)
+            for (int i = greedyOrderedScrap.Count - 1; i >= 0; i--)
             {
                 GrabbableObject currentScrap = greedyOrderedScrap[i];
                 // Find from low to high the first scrap which when added to the combination, makes the sum higher than the target
