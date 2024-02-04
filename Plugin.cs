@@ -90,7 +90,7 @@ namespace MinimumQuotaFinder
     {
         private const string GUID = "com.github.riceisacereal.MinimumQuotaFinder";
         private const string NAME = "MinimumQuotaFinder";
-        private const string VERSION = "1.0.1";
+        private const string VERSION = "1.1.0";
 
         public static MinimumQuotaFinder Instance
         {
