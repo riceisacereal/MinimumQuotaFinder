@@ -15,7 +15,7 @@ Scrap auto-selling mods: [SellMyScrap](https://thunderstore.io/c/lethal-company/
 - **Press `H` to toggle the highlighting/recalculate**
   - The keybind can be changed in the settings.
 - Calculation always assumes that you are selling when the company is **buying at 100%**. See [this section](#buying-rate-calculation) why.
-  - Starting from v1.1.0, calculation is disabled on the compan moon when buying rate is < 100%
+  - Starting from v1.1.0, calculation is disabled on the company moon when buying rate is < 100%
 - When you're on the company moon, all scrap in the environment is taken into account (including scrap on the counter), unless **its y-value is under -30** (somehow dropped over the railings). Otherwise only scrap within the ship is considered.
   - Pros: You can take items outside the ship on the company moon and they will still be included in the calculation.
 - If you accidentally sold unhighlighted scrap, press H (or the key you rebound it to) to recalculate.
