@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.IO;
 using System.Reflection;
+using System.Threading;
 using BepInEx;
 using GameNetcodeStuff;
 using HarmonyLib;
@@ -102,7 +103,7 @@ namespace MinimumQuotaFinder
         
         public Material wireframeMaterial;
         private bool _toggled = false;
-        private bool _highlightLock = false;
+        private int _highlightLockState = 0;
         private int previousQuota = -1;
         private int previousResult = -1;
         private HashSet<GrabbableObject> previousInclude;
@@ -163,8 +164,6 @@ namespace MinimumQuotaFinder
         
         private void OnHighlightKeyPressed(InputAction.CallbackContext highlightContext)
         {
-            // Cancel key press if still calculating
-            if (_highlightLock) return;
             
             if (!highlightContext.performed || GameNetworkManager.Instance.localPlayerController == null) return;
             
@@ -187,13 +186,29 @@ namespace MinimumQuotaFinder
             if (!CanHighlight(displayReason)) return;
             // Start the coroutine for highlighting, this will give back control after the first round of calculations
             GameNetworkManager.Instance.StartCoroutine(HighlightObjectsCoroutine(displayIfCached));
-            _toggled = true;
         }
 
         public void TurnOffHighlight()
         {
-            UnhighlightObjects();
-            _toggled = false;
+            // Try to acquire the lock
+            int oldValue = Interlocked.CompareExchange(ref _highlightLockState, 1, 0);
+
+            // Return early if the lock was already acquired by something else
+            if (oldValue == 1)
+            {
+                return;
+            }
+
+            try
+            {
+                UnhighlightObjects();
+            }
+            finally
+            {
+                _toggled = false;
+                // Set the lock free
+                Interlocked.Exchange(ref _highlightLockState, 0);
+            }
         }
         
         private List<GrabbableObject> GetAllScrap(int level)
@@ -239,35 +254,46 @@ namespace MinimumQuotaFinder
 
         private IEnumerator HighlightObjectsCoroutine(bool displayIfCached)
         {
-            // Exit early if it is already calculating
-            if (_highlightLock) yield break;
-            
-            // Acquire the highlight lock
-            _highlightLock = true;
-            
-            // Show a message to indicate the starting of the calculations in case of big calculation
-            if (displayIfCached)
-            {
-                HUDManager.Instance.DisplayTip("MinimumQuotaFinder", "Calculating...");
-            }
+            // Try to acquire the lock
+            int oldValue = Interlocked.CompareExchange(ref _highlightLockState, 1, 0);
 
-            List<GrabbableObject> allScrap = GetAllScrap(StartOfRound.Instance.currentLevelID);
-            HashSet<GrabbableObject> toHighlight = new HashSet<GrabbableObject>();
-            // Start a coroutine to calculate which items to highlight, this will give back control after all calculations are finished
-            yield return GameNetworkManager.Instance.StartCoroutine(GetSetToHighlight(allScrap, toHighlight, displayIfCached));
-            // Highlight the objects or untoggle if nothing should be highlighted
-            if (toHighlight.Count > 0)
+            // Return early if lock was already acquired by something else
+            if (oldValue == 1)
             {
-                HighlightObjects(toHighlight);
-                HighlightObjects(GetDeskScrap());
+                yield break;
             }
-            else
+            
+            try
             {
-                _toggled = false;
-            }
+                // Show a message to indicate the starting of the calculations in case of big calculation
+                if (displayIfCached)
+                {
+                    HUDManager.Instance.DisplayTip("MinimumQuotaFinder", "Calculating...");
+                }
 
-            // Set the lock free
-            _highlightLock = false;
+                List<GrabbableObject> allScrap = GetAllScrap(StartOfRound.Instance.currentLevelID);
+                HashSet<GrabbableObject> toHighlight = new HashSet<GrabbableObject>();
+                // Start a coroutine to calculate which items to highlight, this will give back control after all calculations are finished
+                yield return GameNetworkManager.Instance.StartCoroutine(GetSetToHighlight(allScrap, toHighlight,
+                    displayIfCached));
+                // Highlight the objects or untoggle if nothing should be highlighted
+                if (toHighlight.Count > 0)
+                {
+                    UnhighlightObjects();
+                    HighlightObjects(toHighlight);
+                    HighlightObjects(GetDeskScrap());
+                    _toggled = true;
+                }
+                else
+                {
+                    _toggled = false;
+                }
+            }
+            finally
+            {
+                // Set the lock free
+                Interlocked.Exchange(ref _highlightLockState, 0);
+            }
         }
         
         private void HighlightObjects(IEnumerable<GrabbableObject> objectsToHighlight)
@@ -301,10 +327,10 @@ namespace MinimumQuotaFinder
                 // Skip the entry if the object can't be found anymore because it unloaded
                 if (objectEntry.Key == null || objectEntry.Key.materials == null)
                     continue;
-                
+
                 objectEntry.Key.materials = objectEntry.Value;
             }
-            
+
             // Clear the dictionary keeping track of the highlighted objects
             _highlightedObjects.Clear();
         }
