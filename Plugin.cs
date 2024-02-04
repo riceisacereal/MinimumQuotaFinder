@@ -41,10 +41,10 @@ namespace MinimumQuotaFinder
         public static void OnPing(HUDManager __instance, InputAction.CallbackContext context)
         {
             // Don't show message if you're not in the ship on a moon
-            if (StartOfRound.Instance.currentLevelID != 3 && !GameNetworkManager.Instance.localPlayerController.isInHangarShipRoom) return;
+            if (!MinimumQuotaFinder.Instance.CanHighlight(false)) return;
             
             // Patch to add a highlight instruction to the tips on the HUD after performing a scan
-            string message = "Highlight Minimum Quota : [H]";
+            const string message = "Highlight Minimum Quota : [H]";
             
             int i = 0;
             while (i < __instance.controlTipLines.Length && __instance.controlTipLines[i].text != "")
@@ -68,7 +68,7 @@ namespace MinimumQuotaFinder
         {
             if (sceneName == "CompanyBuilding")
             {
-                MinimumQuotaFinder.Instance.TurnOnHighlight(false);
+                MinimumQuotaFinder.Instance.TurnOnHighlight(true, false);
             }
         }
 
@@ -78,7 +78,7 @@ namespace MinimumQuotaFinder
         {
             if (MinimumQuotaFinder.Instance.IsToggled())
             {
-                MinimumQuotaFinder.Instance.TurnOnHighlight(false);
+                MinimumQuotaFinder.Instance.TurnOnHighlight(false, false);
             }
         }
     }
@@ -173,7 +173,7 @@ namespace MinimumQuotaFinder
             // Highlight if toggled, unhighlight otherwise
             if (!_toggled)
             {
-                TurnOnHighlight(true);
+                TurnOnHighlight(true, true);
             }
             else
             {
@@ -181,10 +181,10 @@ namespace MinimumQuotaFinder
             }
         }
 
-        public void TurnOnHighlight(bool displayIfCached)
+        public void TurnOnHighlight(bool displayIfCached, bool displayReason)
         {
             // Cancel the highlighting if the player is outside of their ship on a moon
-            if (StartOfRound.Instance.currentLevelID != 3 && !GameNetworkManager.Instance.localPlayerController.isInHangarShipRoom) return;
+            if (!CanHighlight(displayReason)) return;
             // Start the coroutine for highlighting, this will give back control after the first round of calculations
             GameNetworkManager.Instance.StartCoroutine(HighlightObjectsCoroutine(displayIfCached));
             _toggled = true;
@@ -568,6 +568,34 @@ namespace MinimumQuotaFinder
         public bool IsToggled()
         {
             return _toggled;
+        }
+
+        public bool CanHighlight(bool displayReason)
+        {
+            bool onCompanyMoon = IsOnCompanyMoon(StartOfRound.Instance.currentLevelID);
+            if (onCompanyMoon && Math.Abs(StartOfRound.Instance.companyBuyingRate - 1f) >= 0.001f)
+            {
+                if (displayReason)
+                {
+                    HUDManager.Instance.DisplayTip("MinimumQuotaFinder", "Buying rate is not at 100%, no scrap has been highlighted as the calculations would be inaccurate.");
+                }
+                return false;
+            }
+            if (!onCompanyMoon && !GameNetworkManager.Instance.localPlayerController.isInHangarShipRoom)
+            {
+                if (displayReason)
+                {
+                    HUDManager.Instance.DisplayTip("MinimumQuotaFinder", "Highlighting disabled, player is not on the ship");
+                }
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool IsOnCompanyMoon(int levelID)
+        {
+            return StartOfRound.Instance.levels[levelID].name == "CompanyBuildingLevel";
         }
     }
 
