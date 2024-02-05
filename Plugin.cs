@@ -90,7 +90,7 @@ namespace MinimumQuotaFinder
     {
         private const string GUID = "com.github.riceisacereal.MinimumQuotaFinder";
         private const string NAME = "MinimumQuotaFinder";
-        private const string VERSION = "1.1.0";
+        private const string VERSION = "1.1.1";
 
         public static MinimumQuotaFinder Instance
         {
@@ -100,6 +100,7 @@ namespace MinimumQuotaFinder
         
         internal static HighlightInputClass InputActionsInstance = new();
         private const int THRESHOLD = 300000;
+        private List<string> excludedItemNames = new() {"Shotgun", "Ammo", "Gift"};
         
         public Material wireframeMaterial;
         private bool _toggled = false;
@@ -110,7 +111,7 @@ namespace MinimumQuotaFinder
         private HashSet<GrabbableObject> previousAllScraps;
         private Dictionary<MeshRenderer, Material[]> _highlightedObjects = new();
 
-        // private int id = 65;
+        private int id = 65;
         
         private void Awake()
         {
@@ -129,26 +130,26 @@ namespace MinimumQuotaFinder
         private void SetupKeybindCallbacks()
         {
             InputActionsInstance.HighlightKey.performed += OnHighlightKeyPressed;
-            // InputActionsInstance.SpawnScrap.performed += SpawnScrap;
-            // InputActionsInstance.UpdateId.performed += UpdateId;
+            InputActionsInstance.SpawnScrap.performed += SpawnScrap;
+            InputActionsInstance.UpdateId.performed += UpdateId;
         }
 
-        // public void UpdateId(InputAction.CallbackContext spawnContext)
-        // {
-        //     id--;
-        //     Logger.LogInfo("New ID is: " + id);
-        // }
-        //
-        // public void SpawnScrap(InputAction.CallbackContext spawnContext)
-        // {
-        //     Vector3 position = GameNetworkManager.Instance.localPlayerController.transform.position;
-        //     GameObject val = Instantiate(StartOfRound.Instance.allItemsList.itemsList[id].spawnPrefab, position, Quaternion.identity);
-        //     int value = new System.Random().Next(10, 25);
-        //     val.GetComponent<GrabbableObject>().fallTime = 0f;
-        //     val.AddComponent<ScanNodeProperties>().scrapValue = value;
-        //     val.GetComponent<GrabbableObject>().SetScrapValue(value);
-        //     val.GetComponent<NetworkObject>().Spawn();
-        // }
+        public void UpdateId(InputAction.CallbackContext spawnContext)
+        {
+            id--;
+            Logger.LogInfo($"New ID is: {id}, with name {StartOfRound.Instance.allItemsList.itemsList[id].itemName}");
+        }
+        
+        public void SpawnScrap(InputAction.CallbackContext spawnContext)
+        {
+            Vector3 position = GameNetworkManager.Instance.localPlayerController.transform.position;
+            GameObject val = Instantiate(StartOfRound.Instance.allItemsList.itemsList[id].spawnPrefab, position, Quaternion.identity);
+            int value = new System.Random().Next(10, 25);
+            val.GetComponent<GrabbableObject>().fallTime = 0f;
+            val.AddComponent<ScanNodeProperties>().scrapValue = value;
+            val.GetComponent<GrabbableObject>().SetScrapValue(value);
+            val.GetComponent<Unity.Netcode.NetworkObject>().Spawn();
+        }
 
         private void CreateShader()
         {
@@ -164,7 +165,6 @@ namespace MinimumQuotaFinder
         
         private void OnHighlightKeyPressed(InputAction.CallbackContext highlightContext)
         {
-            
             if (!highlightContext.performed || GameNetworkManager.Instance.localPlayerController == null) return;
             
             if (!HUDManager.Instance.CanPlayerScan() || HUDManager.Instance.playerPingingScan > -0.5f) return;
@@ -229,7 +229,10 @@ namespace MinimumQuotaFinder
             // At the counter, only values of scrap items with a value larger than 0 and are not unreachable (accidentally dropped over the railings)
             // are added to company credit
             List<GrabbableObject> allScrap = scope.GetComponentsInChildren<GrabbableObject>()
-                .Where(obj => obj.itemProperties.isScrap && obj.scrapValue > 0 && obj.transform.position.y > minimumHeight).ToList();
+                .Where(obj => obj.itemProperties.isScrap && 
+                              obj.scrapValue > 0 && 
+                              obj.transform.position.y > minimumHeight &&
+                              !excludedItemNames.Contains(obj.itemProperties.itemName)).ToList();
             
             return allScrap;
         }
@@ -642,10 +645,10 @@ namespace MinimumQuotaFinder
         [InputAction("<Keyboard>/h", Name = "Toggle scrap highlight")]
         public InputAction HighlightKey { get; set; }
         
-        // [InputAction("<Keyboard>/k", Name = "Spawn scrap")]
-        // public InputAction SpawnScrap { get; set; }
-        //
-        // [InputAction("<Keyboard>/j", Name = "Update scrap")]
-        // public InputAction UpdateId { get; set; }
+        [InputAction("<Keyboard>/k", Name = "Spawn scrap")]
+        public InputAction SpawnScrap { get; set; }
+        
+        [InputAction("<Keyboard>/j", Name = "Update scrap")]
+        public InputAction UpdateId { get; set; }
     }
 }
