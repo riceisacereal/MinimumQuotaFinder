@@ -4,18 +4,18 @@ Co-created by [@Luesewr](https://github.com/Luesewr) and [@riceisacereal](https:
 
 This mod calculates and highlights the minimum total value of scraps that you can sell to still reach the quota. **The default key to toggle the highlighting is `H`**, but this can be changed in the settings.
 
-The same in essence as: [ScrapCalculator](https://thunderstore.io/c/lethal-company/p/granny/ScrapCalculator/), [CalculateScrapForQuota](https://thunderstore.io/c/lethal-company/p/Jazzy/CalculateScrapForQuota/)
+The same in essence as: [ScrapCalculator](https://thunderstore.io/c/lethal-company/p/granny/ScrapCalculator/), [CalculateScrapForQuota](https://thunderstore.io/c/lethal-company/p/Jazzy/CalculateScrapForQuota/)\
 Scrap auto-selling mods: [SellMyScrap](https://thunderstore.io/c/lethal-company/p/Zehs/SellMyScrap/), [SellFromTerminal](https://thunderstore.io/c/lethal-company/p/stormytuna/SellFromTerminal/)
 
 ## ✨ 𝓦𝓱𝓪𝓽 𝓸𝓾𝓻 𝓶𝓸𝓭 𝓭𝓸𝓮𝓼 𝓫𝓮𝓽𝓽𝓮𝓻
-- Always finds the most optimal answer quickly (5ms to 1s depending on quota and number of items) using an [optimized algorithm](#explanation-of-algorithm). ([CalculateScrapForQuota](https://thunderstore.io/c/lethal-company/p/Jazzy/CalculateScrapForQuota/) uses the same algorithm)
+- Always finds the most optimal answer quickly (5ms to 1s depending on quota and number of items) using an [optimized algorithm](#explanation-of-algorithm). ([CalculateScrapForQuota](https://thunderstore.io/c/lethal-company/p/Jazzy/CalculateScrapForQuota/) does use the same algorithm, but other similar mods we've found all use a non-optimal algorithm)
 - Cool highlighting shader ✨
 
 ## How the mod works
 - **Press `H` to toggle the highlighting/recalculate**
   - The keybind can be changed in the settings.
 - Calculation always assumes that you are selling when the company is **buying at 100%**. See [this section](#buying-rate-calculation) why.
-  - Starting from v1.1.0, calculation is disabled on the compan moon when buying rate is < 100%
+  - Starting from v1.1.0, calculation is disabled on the company moon when buying rate is < 100%
 - When you're on the company moon, all scrap in the environment is taken into account (including scrap on the counter), unless **its y-value is under -30** (somehow dropped over the railings). Otherwise only scrap within the ship is considered.
   - Pros: You can take items outside the ship on the company moon and they will still be included in the calculation.
 - If you accidentally sold unhighlighted scrap, press H (or the key you rebound it to) to recalculate.
