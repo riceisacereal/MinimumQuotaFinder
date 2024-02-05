@@ -1,4 +1,7 @@
   # Changelog
+## v1.1.1
+### Features
+- Shotguns, Ammo, and Gifts will no longer be taken into account for the calculating/highlighting.
 
 ## v1.1.0
 ### Features
