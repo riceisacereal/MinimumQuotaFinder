@@ -22,10 +22,10 @@
 
   <ItemGroup>
     <Reference Include="LethalCompanyInputUtils">
-      <HintPath>lib/Rune580-LethalCompany_InputUtils-0.5.5/plugins/LethalCompanyInputUtils/LethalCompanyInputUtils.dll</HintPath>
+      <HintPath>../lib/Rune580-LethalCompany_InputUtils-0.5.5/plugins/LethalCompanyInputUtils/LethalCompanyInputUtils.dll</HintPath>
     </Reference>
     <Reference Include="Unity.InputSystem">
-      <HintPath>lib/Unity.InputSystem.dll</HintPath>
+      <HintPath>../lib/Unity.InputSystem.dll</HintPath>
     </Reference>
   </ItemGroup>
 
