@@ -4,7 +4,7 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>MinimumQuotaFinder</AssemblyName>
     <Description>Calculates and highlights the minimum total value of scraps to sell to reach the quota</Description>
-    <Version>1.1.1</Version>
+    <Version>1.1.2</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>

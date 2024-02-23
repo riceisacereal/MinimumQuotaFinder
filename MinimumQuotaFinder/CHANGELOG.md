@@ -1,4 +1,8 @@
-  # Changelog
+# Changelog
+  
+## v1.1.2
+- Remove scrap spawning functionality used for debugging that was accidentally left in
+
 ## v1.1.1
 ### Features
 - Shotguns, Ammo, and Gifts will no longer be taken into account for the calculating/highlighting.
