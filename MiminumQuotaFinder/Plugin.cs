@@ -251,8 +251,13 @@ namespace MinimumQuotaFinder
             // Retrieve value of currently sold scrap and quota
             int sold = TimeOfDay.Instance.quotaFulfilled + GetDeskScrapValue();
             int quota = TimeOfDay.Instance.profitQuota;
-            
-            // Retrieve all scrap in ship
+
+            // If the amount sold has already reached the quota
+            if (sold >= quota)
+            {
+                yield break;
+            }
+
             // If no scrap in ship
             if (allScrap == null || allScrap.Count == 0)
             {
