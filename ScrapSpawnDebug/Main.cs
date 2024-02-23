@@ -1,4 +1,5 @@
 ﻿using BepInEx;
+using BepInEx.Configuration;
 using LethalCompanyInputUtils.Api;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -7,13 +8,26 @@ namespace ScrapSpawnDebug
 {
     [BepInPlugin("ScrapSpawnDebug", "ScrapSpawnDebug", "0.0.1")]
     [BepInDependency("com.rune580.LethalCompanyInputUtils")]
-    public class Plugin : BaseUnityPlugin
+    public class ScrapSpawnDebug : BaseUnityPlugin
     {
         internal static HighlightInputClass InputActionsInstance = new();
         private int id = 65;
         
+        private ConfigEntry<string> configGreeting;
+        private ConfigEntry<bool> configDisplayGreeting;
+        
         private void Awake()
         {
+            configGreeting = Config.Bind("General",
+                                         "GreetingText",
+                                         "Hello, world!",
+                                         "A greeting text to show when the game is launched");
+
+            configDisplayGreeting = Config.Bind("General.Toggles", 
+                                                "DisplayGreeting",
+                                                true,
+                                                "Whether or not to show the greeting text");
+            
             SetupKeybindCallbacks();
             Logger.LogInfo("ScrapSpawnDebug successfully loaded!");
         }
@@ -39,6 +53,8 @@ namespace ScrapSpawnDebug
             val.AddComponent<ScanNodeProperties>().scrapValue = value;
             val.GetComponent<GrabbableObject>().SetScrapValue(value);
             val.GetComponent<Unity.Netcode.NetworkObject>().Spawn();
+
+            configDisplayGreeting.Value = false;
         }
         
         public class HighlightInputClass : LcInputActions 
