@@ -187,12 +187,14 @@ namespace MinimumQuotaFinder
                 // Start a coroutine to calculate which items to highlight, this will give back control after all calculations are finished
                 yield return GameNetworkManager.Instance.StartCoroutine(GetSetToHighlight(allScrap, toHighlight,
                     displayIfCached));
+
+                List<GrabbableObject> deskScrap = GetDeskScrap();
                 // Highlight the objects or untoggle if nothing should be highlighted
-                if (toHighlight.Count > 0)
+                if (toHighlight.Count + deskScrap.Count > 0)
                 {
                     UnhighlightObjects();
                     HighlightObjects(toHighlight);
-                    HighlightObjects(GetDeskScrap());
+                    HighlightObjects(deskScrap);
                     _toggled = true;
                 }
                 else
@@ -253,9 +255,8 @@ namespace MinimumQuotaFinder
             int quota = TimeOfDay.Instance.profitQuota;
 
             // If the amount sold has already reached the quota
-            if (TimeOfDay.Instance.quotaFulfilled >= quota)
+            if (sold >= quota)
             {
-                UnhighlightObjects();
                 HUDManager.Instance.DisplayTip("MinimumQuotaFinder","Quota has already been reached.");
                 yield break;
             }
