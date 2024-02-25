@@ -15,10 +15,10 @@ Scrap auto-selling mods: [SellMyScrap](https://thunderstore.io/c/lethal-company/
 - **Press `H` to toggle the highlighting/recalculate**
   - The keybind can be changed in the settings.
 - Calculation always assumes that you are selling when the company is **buying at 100%**. See [this section](#buying-rate-calculation) why.
-- Starting from `v1.1.0`, calculation is disabled on the company moon when buying rate is < 100%
+  - Starting from `v1.1.0`, calculation is disabled on the company moon when buying rate is < 100%
 - When you're on the company moon, all scrap in the environment is taken into account (including scrap on the counter), unless **its y-value is under -30** (somehow dropped over the railings). Otherwise only scrap within the ship is considered.
-  - Pros: You can take items outside the ship on the company moon and they will still be included in the calculation.
-- Starting from `v1.1.1`, Shotguns, Ammo, and Gifts are excluded from the calculation by default.
+  - You can take items outside the ship on the company moon and they will still be included in the calculation.
+  - Starting from `v1.1.1`, Shotguns, Ammo, and Gifts are excluded from the calculation by default.
 - If you accidentally sold unhighlighted scrap, press H (or the key you rebound it to) to recalculate.
   - Starting from `v1.1.0`, the mod will automatically re-calculate when you accidentally sold the wrong scrap
 - This is a client-side mod, which means that there is a small chance of different items being highlighted for different people. We have several methods in place to prevent this from happening, but you never know.
@@ -59,7 +59,7 @@ The way the buying rate is considered when selling things is by multiplying the 
 
 Of course, we could calculate every item's actual buying price beforehand, but the algorithm only works with integers so we have get rid of the decimals before calculation. Rounding up could cause undershooting, normal rounding doesn't guarantee everything adds up again, and rounding down would cause overshooting. (The amount it overshoots by scales with the amount of scrap you are selling. Let's say on average you shave off 0.5 real value per scrap, if you sell 50 pieces of scrap you'll lose 25 company credits - about a whole piece of scrap.)
 
-Aditionally, what makes calculation even more complicated is you can only put a limited number (12) of scrap on the counter to sell every time, which means that the order of batches you sell your scrap in also affects how much value you're losing.
+Additionally, what makes calculation even more complicated is you can only put a limited number (12) of scrap on the counter to sell every time, which means that the order of batches you sell your scrap in also affects how much value you're losing.
 
 To get the optimal answer in this situation, the problem then becomes "in what order of batches does one sell in to minimize scrap value loss", but that's a whole separate challenge which is too big in comparison to the problem it tries to solve. Since this mod is intended for min-maxing gameplay and we see no overwhelming reason that one would sell at a lower buying rate when approaching the game this way, currently we do not have plans to consider lower buying rates, and calculations will be disabled for buying rates < 100%.
 

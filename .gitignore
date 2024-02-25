@@ -2,4 +2,5 @@ bin
 lib
 obj
 .idea
+*.user
 MinimumQuotaFinder.zip
