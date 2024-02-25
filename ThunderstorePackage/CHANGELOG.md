@@ -1,5 +1,8 @@
 # Changelog
   
+## v1.1.3
+- Fix edge case where the lowest valued scrap would be highlighted when the quota was already reached
+
 ## v1.1.2
 - Remove scrap spawning functionality used for debugging that was accidentally left in
 
