@@ -257,7 +257,9 @@ namespace MinimumQuotaFinder
             // If the amount sold has already reached the quota
             if (sold >= quota)
             {
-                HUDManager.Instance.DisplayTip("MinimumQuotaFinder","Quota has already been reached.");
+                int difference = sold - quota;
+                string colour = difference == 0 ? "#A5D971" : "#992403";
+                HUDManager.Instance.DisplayTip("MinimumQuotaFinder",$"Quota has been reached (<color={colour}>{sold}</color>/{quota}).");
                 yield break;
             }
 
