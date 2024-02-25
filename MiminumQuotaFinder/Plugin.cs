@@ -253,8 +253,10 @@ namespace MinimumQuotaFinder
             int quota = TimeOfDay.Instance.profitQuota;
 
             // If the amount sold has already reached the quota
-            if (sold >= quota)
+            if (TimeOfDay.Instance.quotaFulfilled >= quota)
             {
+                UnhighlightObjects();
+                HUDManager.Instance.DisplayTip("MinimumQuotaFinder","Quota has already been reached.");
                 yield break;
             }
 
