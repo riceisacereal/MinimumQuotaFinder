@@ -50,7 +50,7 @@ public class MathUtilities
         return greedyCombination;
     }
     
-    public static IEnumerator GetIncludedCoroutine(List<GrabbableObject> allScrap, bool inverseTarget, int calculationTarget,
+    public static IEnumerator GetIncludedCoroutine(List<GrabbableObject> allScrap, bool inverseTarget, int target, int calculationTarget,
             HashSet<GrabbableObject> includedScrap)
     {
         // Subset sum/knapsack on total value of all scraps - quota + already paid quota
@@ -62,6 +62,8 @@ public class MathUtilities
         {
             prev[i] = new MemCell(0, new HashSet<GrabbableObject>());
         }
+
+        int earlyTerminationTarget = inverseTarget ? calculationTarget : target;
         
         int calculations = 0;
         for (int y = 1; y <= numItems; y++)
@@ -98,18 +100,20 @@ public class MathUtilities
             current = new MemCell[calculationTarget + 1];
             
             // Check if the current best at target index is already equal to the target (most optimal)
-            if (prev[target].Max == target)
+            // Inverse -> calculationTarget
+            // Direct -> target
+            if (prev[earlyTerminationTarget].Max == earlyTerminationTarget)
             {
                 if (inverseTarget)
                 {
                     // If we are calculating the inverse target, prev[target].Included contains what to exclude
                     // So add scrap that is not in prev[target].Included to the final result
-                    includedScrap.UnionWith(allScrap.Where(scrap => !prev[target].Included.Contains(scrap)));
+                    includedScrap.UnionWith(allScrap.Where(scrap => !prev[earlyTerminationTarget].Included.Contains(scrap)));
                 }
                 else
                 {
                     // If we are calculating the direct target, prev[target].Included contains what to include
-                    includedScrap.UnionWith(prev[target].Included);
+                    includedScrap.UnionWith(prev[earlyTerminationTarget].Included);
                 }
                 
                 // Break coroutine
