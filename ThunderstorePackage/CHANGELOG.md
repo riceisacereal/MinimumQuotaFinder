@@ -1,5 +1,8 @@
 # Changelog
-  
+
+## v1.1.4
+- Fix bug where direct target would be taken as actual target to calculate leading to suboptimal results
+
 ## v1.1.3
 - Fix edge case where the lowest valued scrap would be highlighted when the quota was already reached
 
