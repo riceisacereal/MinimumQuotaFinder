@@ -50,23 +50,25 @@ public class MathUtilities
         return greedyCombination;
     }
     
-    public static IEnumerator GetIncludedCoroutine(List<GrabbableObject> allScrap, bool inverseTarget, int target,
+    public static IEnumerator GetIncludedCoroutine(List<GrabbableObject> allScrap, bool inverseTarget, int target, int calculationTarget,
             HashSet<GrabbableObject> includedScrap)
     {
         // Subset sum/knapsack on total value of all scraps - quota + already paid quota
         int numItems = allScrap.Count;
 
-        MemCell[] prev = new MemCell[target + 1];
-        MemCell[] current = new MemCell[target + 1];
+        MemCell[] prev = new MemCell[calculationTarget + 1];
+        MemCell[] current = new MemCell[calculationTarget + 1];
         for (int i = 0; i < prev.Length; i++)
         {
             prev[i] = new MemCell(0, new HashSet<GrabbableObject>());
         }
+
+        int earlyTerminationTarget = inverseTarget ? calculationTarget : target;
         
         int calculations = 0;
         for (int y = 1; y <= numItems; y++)
         {
-            for (int x = 0; x <= target; x++)
+            for (int x = 0; x <= calculationTarget; x++)
             {
                 int currentScrapValue = allScrap[y - 1].scrapValue;
                 // Copy the previous data if the current amount is lower than the value of the scrap
@@ -95,21 +97,23 @@ public class MathUtilities
             
             // Update the previous and clear the current
             prev = current;
-            current = new MemCell[target + 1];
+            current = new MemCell[calculationTarget + 1];
             
             // Check if the current best at target index is already equal to the target (most optimal)
-            if (prev[target].Max == target)
+            // Inverse -> calculationTarget
+            // Direct -> target
+            if (prev[earlyTerminationTarget].Max == earlyTerminationTarget)
             {
                 if (inverseTarget)
                 {
                     // If we are calculating the inverse target, prev[target].Included contains what to exclude
                     // So add scrap that is not in prev[target].Included to the final result
-                    includedScrap.UnionWith(allScrap.Where(scrap => !prev[target].Included.Contains(scrap)));
+                    includedScrap.UnionWith(allScrap.Where(scrap => !prev[earlyTerminationTarget].Included.Contains(scrap)));
                 }
                 else
                 {
                     // If we are calculating the direct target, prev[target].Included contains what to include
-                    includedScrap.UnionWith(prev[target].Included);
+                    includedScrap.UnionWith(prev[earlyTerminationTarget].Included);
                 }
                 
                 // Break coroutine
@@ -117,7 +121,7 @@ public class MathUtilities
             }
             
             // Add the amount of calculations to calculations, yield if the number of calculations surpass the threshold
-            calculations += target;
+            calculations += calculationTarget;
             if (calculations > THRESHOLD)
             {
                 yield return null;
@@ -130,7 +134,7 @@ public class MathUtilities
         {
             // If inverse target was calculated, add the most optimal combination to the excluded set, and
             // add the opposite to the included set
-            includedScrap.UnionWith(allScrap.Where(scrap => !prev[target].Included.Contains(scrap)));
+            includedScrap.UnionWith(allScrap.Where(scrap => !prev[calculationTarget].Included.Contains(scrap)));
         }
         else
         {

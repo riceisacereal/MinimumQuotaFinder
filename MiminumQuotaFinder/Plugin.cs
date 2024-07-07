@@ -148,7 +148,7 @@ namespace MinimumQuotaFinder
         private List<GrabbableObject> GetDeskScrap()
         {
             List<GrabbableObject> allScrap = new List<GrabbableObject>();
-            DepositItemsDesk desk = FindObjectOfType<DepositItemsDesk>();
+            DepositItemsDesk desk = FindFirstObjectByType<DepositItemsDesk>();
             if (desk != null)
             {
                 allScrap.AddRange(desk.deskObjectsContainer.GetComponentsInChildren<GrabbableObject>()
@@ -301,8 +301,9 @@ namespace MinimumQuotaFinder
             // Update the previous all scraps variable
             previousAllScraps = allScrap.ToHashSet();
 
+            int target = quota - sold;
             // Get the inverseTarget
-            int inverseTarget = allScrap.Sum(scrap => scrap.scrapValue) - (quota - sold);
+            int inverseTarget = allScrap.Sum(scrap => scrap.scrapValue) - target;
             
             // Determine which calculation is faster
             bool useInverseTarget = inverseTarget <= quota;
@@ -310,15 +311,15 @@ namespace MinimumQuotaFinder
             {
                 // Start a coroutine to calculate which objects to include
                 yield return GameNetworkManager.Instance.StartCoroutine(
-                    GetIncludedCoroutine(allScrap, true, inverseTarget, includedScrap));
+                    GetIncludedCoroutine(allScrap, true, target, inverseTarget, includedScrap));
             }
             else
             {
                 // Get the direct target by doing a quick Greedy approximation
                 List<GrabbableObject> greedyApproximation = GetGreedyApproximation(allScrap, quota - sold);
-                int directTarget = greedyApproximation.Sum(scrap => scrap.scrapValue);
+                int greedyTarget = greedyApproximation.Sum(scrap => scrap.scrapValue);
                 // If the approximation found is equal to the actual target, include the approximation combination directly
-                if (directTarget == quota - sold)
+                if (greedyTarget == quota - sold)
                 {
                     includedScrap.UnionWith(greedyApproximation);
                 }
@@ -326,7 +327,7 @@ namespace MinimumQuotaFinder
                 {
                     // Start a coroutine to calculate which objects to include
                     yield return GameNetworkManager.Instance.StartCoroutine(
-                        GetIncludedCoroutine(allScrap, false, directTarget, includedScrap));
+                        GetIncludedCoroutine(allScrap, false, target, greedyTarget, includedScrap));
                 }
             }
 
