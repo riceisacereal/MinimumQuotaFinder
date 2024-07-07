@@ -20,7 +20,7 @@ namespace MinimumQuotaFinder
     {
         private const string GUID = "com.github.riceisacereal.MinimumQuotaFinder";
         private const string NAME = "MinimumQuotaFinder";
-        private const string VERSION = "1.1.2";
+        private const string VERSION = "1.1.3";
 
         public static MinimumQuotaFinder Instance
         {
@@ -148,7 +148,7 @@ namespace MinimumQuotaFinder
         private List<GrabbableObject> GetDeskScrap()
         {
             List<GrabbableObject> allScrap = new List<GrabbableObject>();
-            DepositItemsDesk desk = FindObjectOfType<DepositItemsDesk>();
+            DepositItemsDesk desk = FindFirstObjectByType<DepositItemsDesk>();
             if (desk != null)
             {
                 allScrap.AddRange(desk.deskObjectsContainer.GetComponentsInChildren<GrabbableObject>()
